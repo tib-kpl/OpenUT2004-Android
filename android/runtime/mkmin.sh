@@ -14,11 +14,16 @@ mkdir -p "$OUT/usr/bin" "$OUT/usr/lib" "$OUT/usr/sbin" "$OUT/etc" "$OUT/tmp" "$O
          "$OUT/home" "$OUT/game" "$OUT/dev" "$OUT/proc" "$OUT/sys" "$OUT/storage" "$OUT/sdcard"
 chmod 1777 "$OUT/tmp"
 
-copy() { # copie un chemin (et la cible s'il s'agit d'un lien) en preservant l'arborescence
+copy() { # copie un chemin en preservant l'arborescence ; pour un lien, copie aussi chaque
+          # etape de la chaine (ex. /usr/bin/awk -> /etc/alternatives/awk -> /usr/bin/mawk)
     for p in "$@"; do
         [ -e "$p" ] || [ -L "$p" ] || { echo "absent: $p" >&2; continue; }
-        cp -a --parents "$p" "$OUT/"
-        if [ -L "$p" ]; then copy "$(readlink -f "$p")"; fi
+        [ -e "$OUT$p" ] || [ -L "$OUT$p" ] || cp -a --parents "$p" "$OUT/"
+        if [ -L "$p" ]; then
+            target=$(readlink "$p")
+            case "$target" in /*) ;; *) target="$(dirname "$p")/$target" ;; esac
+            copy "$target"
+        fi
     done
 }
 
