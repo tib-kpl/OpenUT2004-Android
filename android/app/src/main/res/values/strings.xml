@@ -42,4 +42,26 @@
     <string name="game_starting">Démarrage du jeu…</string>
     <string name="game_error">Erreur lors de la préparation : %1$s</string>
     <string name="game_exited">Le jeu s\'est arrêté (code %1$d).\n\n%2$s</string>
+    <string name="input_mode_menu">Souris : ON</string>
+    <string name="input_mode_game">Souris : OFF</string>
+    <string name="btn_return_game">Retour au jeu</string>
+    <string name="input_text_title">Saisie dans le champ sélectionné du jeu</string>
+    <string name="input_text_send">Envoyer</string>
+    <string name="graphics_title">Graphismes</string>
+    <string name="graphics_driver">Pilote graphique</string>
+    <string name="graphics_resolution">Résolution de rendu</string>
+    <string name="graphics_fps">Afficher les FPS du moteur</string>
+    <string name="graphics_apply">Appliquer</string>
+    <string name="graphics_summary">Graphismes : %1$dp · %2$s</string>
+    <string name="graphics_help">Pour améliorer la fluidité, essayez Turnip et 540p. Le rendu logiciel sert au dépannage et sera plus lent. Le pilote et la résolution prennent effet au prochain lancement ; les FPS changent dès le retour au jeu.</string>
+    <string-array name="graphics_drivers">
+        <item>Automatique</item>
+        <item>Vulkan · Turnip intégré</item>
+        <item>Logiciel · dépannage</item>
+    </string-array>
+    <string-array name="graphics_resolutions">
+        <item>540p · performance</item>
+        <item>720p · équilibre</item>
+        <item>1080p · netteté</item>
+    </string-array>
 </resources>

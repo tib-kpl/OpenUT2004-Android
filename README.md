@@ -45,7 +45,26 @@ To change the game folder later: **long-press the icon → "Changer le dossier d
 
 ### Gamepad controls
 
-The gamepad is translated to UT2004's default keyboard and mouse controls.
+The gamepad is translated to keyboard and mouse controls. It starts in **Menus** mode.
+The mode follows the engine's GUI state. **Select** (or the small mode button) remains a
+manual override until the next GUI transition. The centered button displays Mouse ON/OFF
+in the selected game language, with a large touch target and smaller text.
+
+In Menus mode, the right stick moves the cursor more slowly, R2 clicks, A sends Enter,
+B goes back, X sends Tab to focus the next control, and the D-pad moves between controls
+(down: next, up: previous); left/right change the selected value. The left stick sends arrow keys to change the
+selected list or value. Select a text field, then press Y to enter text with
+the Android keyboard (the text is appended to the selected field). Touch input also
+positions and clicks the mouse in Menus mode.
+
+The settings gear pauses the current session. **Retour au jeu** resumes it without
+restarting the engine. Graphics changes apply on the next launch; the settings provide
+automatic GPU selection, integrated Vulkan Turnip, software rendering for troubleshooting,
+540p/720p/1080p, and an optional counter that measures engine frames rather than screen refreshes.
+Toggle it in **Graphismes ? Afficher les FPS du moteur**; the visibility changes immediately
+when returning to the running session.
+
+In Game mode:
 
 | Button | Action |
 |---|---|
@@ -54,14 +73,15 @@ The gamepad is translated to UT2004's default keyboard and mouse controls.
 | R2 | Fire (left click, also clicks in menus) |
 | L2 | Alt fire (right click) |
 | A | Jump |
-| B | Crouch |
+| B | Escape / menu |
 | X | Use |
 | Y | Translocator |
 | L1 / R1 | Previous / next weapon |
 | Start | Menu |
-| Select | Scores |
+| Select | Switch Menus / Game mode |
 | D-pad | Arrow keys (menus) |
-| L3 | Best weapon |
+| L3 | Crouch |
+| R3 | Best weapon |
 
 ## How it works
 

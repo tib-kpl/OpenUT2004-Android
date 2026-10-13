@@ -109,7 +109,7 @@ jobs:
         run: |
           NAME="0.1.${GITHUB_RUN_NUMBER}"
           echo "OPENUT2004_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
-          echo "OPENUT2004_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "OPENUT2004_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=v$NAME" >> "$GITHUB_ENV"
           echo "APK_NAME=OpenUT2004-$NAME.apk" >> "$GITHUB_ENV"
 

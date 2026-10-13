@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="input_mode_menu">Mysz : ON</string>
+    <string name="input_mode_game">Mysz : OFF</string>
+</resources>

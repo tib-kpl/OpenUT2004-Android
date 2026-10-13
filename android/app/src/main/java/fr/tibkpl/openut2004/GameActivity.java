@@ -15,6 +15,9 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.widget.Button;
+import android.widget.EditText;
+import android.app.AlertDialog;
 
 import java.io.File;
 
@@ -35,8 +38,12 @@ public class GameActivity extends Activity {
     private TextView message;
     private GameRuntime runtime;
     private InputBridge input;
+    private Button inputMode;
+    private TextView fpsCounter;
     private AudioBridge audio;
     private volatile boolean finishing;
+    private boolean resumed;
+    private java.util.List<String> availableLanguages;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +66,7 @@ public class GameActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
         addSettingsButton();
+        addInputModeButton();
         hideSystemBars();
 
         String path = getIntent().getStringExtra(EXTRA_GAME_DIR);
@@ -88,29 +96,46 @@ public class GameActivity extends Activity {
         try {
             audio = new AudioBridge(runtime.audioFifo());
             audio.start();
-            InputBridge.debug = true; // TODO : retirer une fois la manette validee
-            input = new InputBridge();
+            InputBridge.debug = false;
+            input = new InputBridge(menu -> runOnUiThread(() -> {
+                if (input == null || finishing) return;
+                input.setMenuMode(menu);
+                updateInputModeButton();
+            }));
 
             Point screen = screenSize();
             // Hauteur de rendu choisie (largeur au format de l'ecran, donc 16:9 sur un ecran
             // 16:9) ; l'image est ensuite agrandie a la taille de l'ecran.
             int height = Math.min(GameData.getRenderHeight(this), screen.y);
             int width = Math.round(height * (float) screen.x / screen.y) & ~1;
+            input.setPointerBounds(width, height);
 
             runtime.framebufferFile().delete();
             FramebufferView view = new FramebufferView(this, runtime.framebufferFile());
+            view.setOnTouchListener((v, event) -> input.onTouch(event, width, height, v.getWidth(), v.getHeight()));
             root.addView(view, 0, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            root.addView(new MenuCursorView(this, input), 1, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-            String language = GameData.getLanguage(this, GameData.detectLanguages(config.gameRoot, config.patchDir));
+            availableLanguages = GameData.detectLanguages(config.gameRoot, config.patchDir);
+            String language = GameData.getLanguage(this, availableLanguages);
+            updateInputModeButton();
             GameInstaller.prepareConfig(config, width, height, language);
             boolean retry = getIntent().getBooleanExtra(EXTRA_SOFTWARE_RETRY, false);
-            boolean gpu = !retry && runtime.gpuAvailable() && !GameData.isGpuFailed(this);
+            String renderer = GameData.getRenderer(this);
+            boolean gpu = !retry && runtime.gpuAvailable() && !"software".equals(renderer)
+                    && ("turnip".equals(renderer) || !GameData.isGpuFailed(this));
             Log.i(TAG, "Rendu " + (gpu ? "GPU (Turnip + Zink)" : "logiciel") + ", " + width + "x" + height);
             java.lang.Process process = runtime.start(width, height, input.port(), gpu);
+            if (!resumed) {
+                input.setPaused(true);
+                audio.setPaused(true);
+            }
             message.setText(R.string.game_starting);
             message.postDelayed(() -> message.setVisibility(View.GONE), 4000);
             watch(process, gpu);
+            addFpsCounter();
             if (retry) {
                 // Le rendu logiciel tient la ou le GPU echouait : on le retient pour cet appareil
                 message.postDelayed(() -> {
@@ -177,15 +202,116 @@ public class GameActivity extends Activity {
     }
 
     private void openSettings() {
-        finishing = true;
-        if (runtime != null) runtime.stop();
-        startActivity(new Intent(this, LauncherActivity.class).setAction(LauncherActivity.ACTION_SETTINGS));
-        finish();
+        startActivity(new Intent(this, LauncherActivity.class).setAction(LauncherActivity.ACTION_SETTINGS)
+                .putExtra(LauncherActivity.EXTRA_RETURN_TO_GAME, true));
+    }
+
+    /** Explicit mode: UT2004 also captures the mouse in some menu screens. */
+    private void addInputModeButton() {
+        inputMode = new Button(this);
+        inputMode.setText(R.string.input_mode_menu);
+        inputMode.setTextSize(11);
+        inputMode.setAlpha(0.7f);
+        inputMode.setFocusable(false);
+        inputMode.setAllCaps(false);
+        inputMode.setMinimumHeight(0);
+        inputMode.setMinHeight(0);
+        inputMode.setMinWidth(0);
+        inputMode.setMinimumWidth(0);
+        int gap = Math.round(8 * getResources().getDisplayMetrics().density);
+        inputMode.setPadding(gap, gap / 2, gap, gap / 2);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                gap * 17, gap * 6, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        lp.setMargins(0, gap, 0, 0);
+        root.addView(inputMode, lp);
+        inputMode.setOnClickListener(v -> toggleInputMode());
+    }
+
+    private void toggleInputMode() {
+        if (input == null) return;
+        input.setMenuMode(!input.isMenuMode());
+        updateInputModeButton();
+    }
+
+    private void updateInputModeButton() {
+        if (inputMode == null) return;
+        String language = availableLanguages == null ? "frt" : GameData.getLanguage(this, availableLanguages);
+        String tag;
+        switch (language) {
+            case "frt": tag = "fr"; break;
+            case "det": tag = "de"; break;
+            case "est": tag = "es"; break;
+            case "itt": tag = "it"; break;
+            case "ptt": tag = "pt"; break;
+            case "nlt": tag = "nl"; break;
+            case "plt": tag = "pl"; break;
+            case "het": tag = "hu"; break;
+            case "rut": tag = "ru"; break;
+            case "elt": tag = "el"; break;
+            case "kot": tag = "ko"; break;
+            case "ctt": tag = "zh-Hant"; break;
+            case "smt": tag = "zh-Hans"; break;
+            case "tmt": tag = "th"; break;
+            default: tag = "en";
+        }
+        android.content.res.Configuration localized = new android.content.res.Configuration(getResources().getConfiguration());
+        localized.setLocale(java.util.Locale.forLanguageTag(tag));
+        inputMode.setText(createConfigurationContext(localized).getString(
+                input == null || input.isMenuMode() ? R.string.input_mode_menu : R.string.input_mode_game));
+    }
+
+    private void addFpsCounter() {
+        TextView fps = new TextView(this);
+        fpsCounter = fps;
+        fps.setVisibility(GameData.showFps(this) ? View.VISIBLE : View.GONE);
+        fps.setTextColor(0xffffffff);
+        fps.setBackgroundColor(0x99000000);
+        fps.setTextSize(12);
+        fps.setPadding(12, 6, 12, 6);
+        fps.setFocusable(false);
+        root.addView(fps, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START));
+        File stats = new File(runtime.logFile().getParentFile(), "render-fps.txt");
+        fps.post(new Runnable() {
+            @Override public void run() {
+                if (finishing || isFinishing() || isDestroyed()) return;
+                String value = "—";
+                try {
+                    String reading = new String(java.nio.file.Files.readAllBytes(stats.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8).trim();
+                    if (reading.matches("[0-9]+\\.[0-9]")) value = reading;
+                } catch (Exception ignored) { }
+                fps.setText(value + " FPS");
+                fps.postDelayed(this, 1000);
+            }
+        });
+    }
+
+    private void openGameKeyboard() {
+        EditText text = new EditText(this);
+        text.setSingleLine(true);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.input_text_title).setView(text)
+                .setPositiveButton(R.string.input_text_send, (d, which) -> input.sendText(text.getText().toString()))
+                .setNegativeButton(android.R.string.cancel, null).create();
+        dialog.setOnShowListener(d -> {
+            text.requestFocus();
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        });
+        dialog.show();
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
+        if (input != null && input.isMenuMode() && keyCode == KeyEvent.KEYCODE_BUTTON_Y) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) openGameKeyboard();
+            return true;
+        }
+        if (input != null && keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) toggleInputMode();
+            return true;
+        }
         boolean system = keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
                 || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE || keyCode == KeyEvent.KEYCODE_HOME;
         if (!system && input != null && input.onKey(event)) return true;
@@ -201,6 +327,7 @@ public class GameActivity extends Activity {
     /** Appli en arriere-plan ou ecran verrouille : jeu fige et son coupe. */
     @Override
     protected void onPause() {
+        resumed = false;
         super.onPause();
         if (input != null) input.setPaused(true);
         if (audio != null) audio.setPaused(true);
@@ -209,6 +336,9 @@ public class GameActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        updateInputModeButton();
+        if (fpsCounter != null) fpsCounter.setVisibility(GameData.showFps(this) ? View.VISIBLE : View.GONE);
+        resumed = true;
         if (audio != null) audio.setPaused(false);
         if (input != null) input.setPaused(false);
     }

@@ -5,9 +5,12 @@ import android.util.SparseIntArray;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -16,7 +19,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Convertit manette et clavier Android en clavier/souris pour le moteur, injectes dans
- * l'ecran X virtuel par libutbridge.so (XTest) : le jeu et ses menus les recoivent comme un
+ * SDL et l'ecran X virtuel par libutbridge.so : le jeu et ses menus les recoivent comme un
  * vrai clavier et une vraie souris. Format des messages : voir runtime/utbridge/utbridge.c.
  *
  * Disposition (touches par defaut d'UT2004) : stick gauche = ZQSD/WASD, stick droit = souris,
@@ -30,9 +33,12 @@ final class InputBridge {
     private static final int MSG_BUTTON = 2;
     private static final int MSG_MOTION = 3;
     private static final int MSG_PAUSE = 4;
+    private static final int MSG_POSITION = 5;
+    private static final int MSG_TEXT = 6;
 
     // Keysyms X11
     private static final int XK_BACKSPACE = 0xff08, XK_TAB = 0xff09, XK_RETURN = 0xff0d,
+            XK_BACK_TAB = 0xfe20,
             XK_ESCAPE = 0xff1b, XK_LEFT = 0xff51, XK_UP = 0xff52, XK_RIGHT = 0xff53, XK_DOWN = 0xff54,
             XK_F1 = 0xffbe, XK_SHIFT_L = 0xffe1, XK_CONTROL_L = 0xffe3, XK_ALT_L = 0xffe9,
             XK_DELETE = 0xffff, XK_PAGE_UP = 0xff55, XK_PAGE_DOWN = 0xff56, XK_HOME = 0xff50, XK_END = 0xff57;
@@ -103,12 +109,23 @@ final class InputBridge {
     private static final float TRIGGER_PRESS = 0.5f, TRIGGER_RELEASE = 0.25f;
 
     private final ServerSocket server;
+    interface ModeListener { void onModeChanged(boolean menu); }
+    private final ModeListener modeListener;
+    private volatile Socket activeSocket;
+    private final Thread sender;
     private final BlockingQueue<byte[]> queue = new LinkedBlockingQueue<>();
     private volatile boolean closed;
     private volatile byte[] lastPause;
 
     // Etat de la manette
     private volatile float aimX, aimY;
+    private volatile boolean menuMode = true;
+    private int pointerWidth = 1280, pointerHeight = 720;
+    private volatile int pointerX = 640, pointerY = 360;
+    private final Handler touchHandler = new Handler(Looper.getMainLooper());
+    private int touchGesture;
+    private final SparseIntArray heldPadKeys = new SparseIntArray();
+    private final int[] heldMoveKeys = new int[4];
     private final boolean[] moveKeys = new boolean[4]; // w, s, a, d
     private final boolean[] triggers = new boolean[2]; // L2, R2 (axes analogiques)
     private boolean triggerKeys; // la manette envoie des touches L2/R2
@@ -116,12 +133,13 @@ final class InputBridge {
 
     static boolean debug;
 
-    InputBridge() throws IOException {
+    InputBridge(ModeListener modeListener) throws IOException {
+        this.modeListener = modeListener;
         // IPv4 explicite : sur Android, getLoopbackAddress() renvoie ::1 (IPv6)
         server = new ServerSocket(0, 1, InetAddress.getByAddress(new byte[]{127, 0, 0, 1}));
-        Thread accept = new Thread(this::sendLoop, "ut2004-input");
-        accept.setDaemon(true);
-        accept.start();
+        sender = new Thread(this::sendLoop, "ut2004-input");
+        sender.setDaemon(true);
+        sender.start();
         Thread aim = new Thread(this::aimLoop, "ut2004-aim");
         aim.setDaemon(true);
         aim.start();
@@ -131,8 +149,75 @@ final class InputBridge {
         return server.getLocalPort();
     }
 
+    boolean isMenuMode() { return menuMode; }
+
+    synchronized void setPointerBounds(int width, int height) {
+        pointerWidth = width;
+        pointerHeight = height;
+        pointerX = width / 2;
+        pointerY = height / 2;
+    }
+
+    float pointerXFraction() { return (float) pointerX / pointerWidth; }
+    float pointerYFraction() { return (float) pointerY / pointerHeight; }
+
+    private synchronized void updatePointer(int type, int value) {
+        if (type == MSG_MOTION) {
+            pointerX = Math.max(0, Math.min(pointerWidth - 1, pointerX + (short)value));
+            pointerY = Math.max(0, Math.min(pointerHeight - 1, pointerY + (short)(value >>> 16)));
+        } else if (type == MSG_POSITION) {
+            pointerX = value & 0xffff;
+            pointerY = (value >>> 16) & 0xffff;
+        }
+    }
+
+    void sendText(String text) {
+        text.codePoints().forEach(c -> send(MSG_TEXT, 0, c));
+    }
+
+    boolean onTouch(MotionEvent event, int width, int height, int viewWidth, int viewHeight) {
+        if (!menuMode || viewWidth <= 0 || viewHeight <= 0) return false;
+        int action = event.getActionMasked();
+        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE
+                && action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return true;
+        if (action != MotionEvent.ACTION_CANCEL) {
+            int x = Math.max(0, Math.min(width - 1, (int)(event.getX() * width / viewWidth)));
+            int y = Math.max(0, Math.min(height - 1, (int)(event.getY() * height / viewHeight)));
+            send(MSG_POSITION, 0, (x & 0xffff) | (y << 16));
+        }
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_CANCEL) touchGesture++;
+        if (action == MotionEvent.ACTION_UP) {
+            // UT updates its GUI cursor after draining SDL events. Let it process the
+            // position before clicking, otherwise the old control receives the click.
+            int gesture = touchGesture;
+            touchHandler.postDelayed(() -> {
+                if (!closed && menuMode && gesture == touchGesture) click(MOUSE_LEFT);
+            }, 100);
+        }
+        return true;
+    }
+
+    void setMenuMode(boolean enabled) {
+        touchGesture++;
+        if (hatX != 0) send(MSG_KEY, hatKey(hatX, true), 0);
+        if (hatY != 0) send(MSG_KEY, hatKey(hatY, false), 0);
+        hatX = hatY = 0;
+        // Release the old bindings before changing what the sticks/buttons mean.
+        aimX = aimY = 0;
+        for (int i = 0; i < moveKeys.length; i++) {
+            if (moveKeys[i]) send(MSG_KEY, heldMoveKeys[i], 0);
+            moveKeys[i] = false;
+        }
+        for (int i = 0; i < heldPadKeys.size(); i++) send(MSG_KEY, heldPadKeys.valueAt(i), 0);
+        heldPadKeys.clear();
+        menuMode = enabled;
+    }
+
     void close() {
         closed = true;
+        touchHandler.removeCallbacksAndMessages(null);
+        sender.interrupt();
+        try { if (activeSocket != null) activeSocket.close(); } catch (IOException ignored) { }
         try {
             server.close();
         } catch (IOException ignored) {
@@ -142,6 +227,11 @@ final class InputBridge {
 
     /** Fige (true) ou relance (false) la boucle du jeu. */
     void setPaused(boolean paused) {
+        if (paused) {
+            setMenuMode(menuMode);
+            setTrigger(0, false);
+            setTrigger(1, false);
+        }
         send(MSG_PAUSE, 0, paused ? 1 : 0);
     }
 
@@ -160,6 +250,16 @@ final class InputBridge {
                 return true;
             }
             int mapped = PAD.get(keyCode, 0);
+            if (menuMode && keyCode == KeyEvent.KEYCODE_DPAD_UP) mapped = XK_BACK_TAB;
+            if (menuMode && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) mapped = XK_TAB;
+            if (menuMode && keyCode == KeyEvent.KEYCODE_BUTTON_A) mapped = XK_RETURN;
+            if (menuMode && keyCode == KeyEvent.KEYCODE_BUTTON_X) mapped = XK_TAB;
+            if (!down && heldPadKeys.indexOfKey(keyCode) >= 0) {
+                mapped = heldPadKeys.get(keyCode);
+                heldPadKeys.delete(keyCode);
+            } else if (down && mapped > 0) {
+                heldPadKeys.put(keyCode, mapped);
+            }
             if (mapped != 0) {
                 if (mapped == -WHEEL_UP || mapped == -WHEEL_DOWN) {
                     if (down) click(-mapped); // molette : un cran par appui
@@ -186,10 +286,10 @@ final class InputBridge {
         // Stick gauche -> W/S/A/D
         float lx = deadzone(event, MotionEvent.AXIS_X);
         float ly = deadzone(event, MotionEvent.AXIS_Y);
-        setMoveKey(0, 'w', ly < -MOVE_THRESHOLD);
-        setMoveKey(1, 's', ly > MOVE_THRESHOLD);
-        setMoveKey(2, 'a', lx < -MOVE_THRESHOLD);
-        setMoveKey(3, 'd', lx > MOVE_THRESHOLD);
+        setMoveKey(0, menuMode ? XK_UP : 'w', ly < -MOVE_THRESHOLD);
+        setMoveKey(1, menuMode ? XK_DOWN : 's', ly > MOVE_THRESHOLD);
+        setMoveKey(2, menuMode ? XK_LEFT : 'a', lx < -MOVE_THRESHOLD);
+        setMoveKey(3, menuMode ? XK_RIGHT : 'd', lx > MOVE_THRESHOLD);
 
         // Stick droit -> souris (deplacement continu, voir aimLoop)
         aimX = deadzone(event, MotionEvent.AXIS_Z);
@@ -205,13 +305,13 @@ final class InputBridge {
         int newHatX = Math.round(event.getAxisValue(MotionEvent.AXIS_HAT_X));
         int newHatY = Math.round(event.getAxisValue(MotionEvent.AXIS_HAT_Y));
         if (newHatX != hatX) {
-            if (hatX != 0) send(MSG_KEY, hatX < 0 ? XK_LEFT : XK_RIGHT, 0);
-            if (newHatX != 0) send(MSG_KEY, newHatX < 0 ? XK_LEFT : XK_RIGHT, 1);
+            if (hatX != 0) send(MSG_KEY, hatKey(hatX, true), 0);
+            if (newHatX != 0) send(MSG_KEY, hatKey(newHatX, true), 1);
             hatX = newHatX;
         }
         if (newHatY != hatY) {
-            if (hatY != 0) send(MSG_KEY, hatY < 0 ? XK_UP : XK_DOWN, 0);
-            if (newHatY != 0) send(MSG_KEY, newHatY < 0 ? XK_UP : XK_DOWN, 1);
+            if (hatY != 0) send(MSG_KEY, hatKey(hatY, false), 0);
+            if (newHatY != 0) send(MSG_KEY, hatKey(newHatY, false), 1);
             hatY = newHatY;
         }
         return true;
@@ -222,10 +322,16 @@ final class InputBridge {
         return Math.abs(v) < STICK_DEADZONE ? 0f : v;
     }
 
+    private int hatKey(int direction, boolean horizontal) {
+        if (menuMode && !horizontal) return direction < 0 ? XK_BACK_TAB : XK_TAB;
+        return horizontal ? (direction < 0 ? XK_LEFT : XK_RIGHT) : (direction < 0 ? XK_UP : XK_DOWN);
+    }
+
     private void setMoveKey(int index, int keysym, boolean pressed) {
         if (moveKeys[index] == pressed) return;
         moveKeys[index] = pressed;
-        send(MSG_KEY, keysym, pressed ? 1 : 0);
+        if (pressed) heldMoveKeys[index] = keysym;
+        send(MSG_KEY, heldMoveKeys[index], pressed ? 1 : 0);
     }
 
     private void analogTrigger(int trigger, float value) {
@@ -251,8 +357,9 @@ final class InputBridge {
         while (!closed) {
             float x = aimX, y = aimY;
             if (x != 0f || y != 0f) {
-                accX += Math.signum(x) * x * x * AIM_SPEED;
-                accY += Math.signum(y) * y * y * AIM_SPEED;
+                float speed = menuMode ? 6f : AIM_SPEED;
+                accX += Math.signum(x) * x * x * speed;
+                accY += Math.signum(y) * y * y * speed;
                 int dx = (int) accX, dy = (int) accY;
                 accX -= dx;
                 accY -= dy;
@@ -278,7 +385,11 @@ final class InputBridge {
     private void sendLoop() {
         while (!closed) {
             try (Socket socket = server.accept()) {
+                activeSocket = socket;
                 socket.setTcpNoDelay(true);
+                Thread reader = new Thread(() -> readLoop(socket), "ut2004-mode");
+                reader.setDaemon(true);
+                reader.start();
                 OutputStream out = socket.getOutputStream();
                 byte[] pending = lastPause;
                 queue.clear();
@@ -295,7 +406,24 @@ final class InputBridge {
         }
     }
 
+    private void readLoop(Socket socket) {
+        try {
+            InputStream in = socket.getInputStream();
+            byte[] message = new byte[8];
+            while (!closed) {
+                int offset = 0;
+                while (offset < message.length) {
+                    int count = in.read(message, offset, message.length - offset);
+                    if (count < 0) return;
+                    offset += count;
+                }
+                if (message[0] == 7 && modeListener != null) modeListener.onModeChanged(message[4] != 0);
+            }
+        } catch (IOException ignored) { }
+    }
+
     private void send(int type, int code, int value) {
+        if (type == MSG_MOTION || type == MSG_POSITION) updatePointer(type, value);
         if (debug && type != MSG_MOTION) Log.d("OpenUT2004Input", "type=" + type + " code=" + code + " value=" + value);
         byte[] msg = {
                 (byte) type, 0, (byte) code, (byte) (code >> 8),
