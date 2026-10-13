@@ -15,14 +15,15 @@ apt-get install -y -q --no-install-recommends \
     libstdc++6 libatomic1 libgl1 libglx0 libopengl0 libgl1-mesa-dri libglx-mesa0 libegl1 \
     libvulkan1 libasound2t64 libx11-6 libxext6 libxcursor1 libxi6 libxfixes3 libxrandr2 \
     libxss1 libxtst6 xvfb x11-xkb-utils xkb-data 7zip unshield mawk \
-    gcc libc6-dev libx11-dev libxtst-dev
+    gcc libc6-dev libx11-dev libxtst-dev libsdl3-dev pkg-config
 
 # 2. Fichiers propres au runtime (run.sh, install-data.sh, asound.conf) et pont
 #    clavier/souris/pause (LD_PRELOAD)
 cp -r "$RUNTIME/rootfs-overlay/." /
 chmod 755 /opt/ut/run.sh /opt/ut/install-data.sh
+# Fonctions SDL3 resolues a l'execution dans la SDL3 fournie par le moteur (pas de -lSDL3)
 gcc -O2 -shared -fPIC -Wall -o /opt/ut/libutbridge.so "$RUNTIME/utbridge/utbridge.c" \
-    -lX11 -lXtst -ldl -lpthread
+    $(pkg-config --cflags sdl3) -lX11 -lXtst -ldl -lpthread
 
 # Mesa Turnip + Zink (GPU Adreno), compile par build-mesa.sh
 if [ -f "$OUT/turnip.tgz" ]; then
