@@ -241,9 +241,9 @@ final class InputBridge {
         if (action != KeyEvent.ACTION_DOWN && action != KeyEvent.ACTION_UP) return false;
         boolean down = action == KeyEvent.ACTION_DOWN;
         if (down && event.getRepeatCount() > 0) return true;
-        int keyCode = event.getKeyCode();
+        int keyCode = ControllerInput.key(event);
 
-        if (isGamepad(event.getSource())) {
+        if (isGamepad(event.getSource()) || ControllerInput.isController(event.getDevice()) || ControllerInput.isButton(keyCode)) {
             if (keyCode == KeyEvent.KEYCODE_BUTTON_L2 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
                 triggerKeys = true;
                 setTrigger(keyCode == KeyEvent.KEYCODE_BUTTON_R2 ? 1 : 0, down);
@@ -281,7 +281,8 @@ final class InputBridge {
 
     /** Sticks, gachettes analogiques et croix "hat". */
     boolean onMotion(MotionEvent event) {
-        if (!isGamepad(event.getSource()) || event.getAction() != MotionEvent.ACTION_MOVE) return false;
+        if ((!isGamepad(event.getSource()) && !ControllerInput.isController(event.getDevice()))
+                || event.getAction() != MotionEvent.ACTION_MOVE) return false;
 
         // Stick gauche -> W/S/A/D
         float lx = deadzone(event, MotionEvent.AXIS_X);
@@ -292,8 +293,8 @@ final class InputBridge {
         setMoveKey(3, menuMode ? XK_RIGHT : 'd', lx > MOVE_THRESHOLD);
 
         // Stick droit -> souris (deplacement continu, voir aimLoop)
-        aimX = deadzone(event, MotionEvent.AXIS_Z);
-        aimY = deadzone(event, MotionEvent.AXIS_RZ);
+        aimX = deadzone(event, ControllerInput.rightAxis(event, true));
+        aimY = deadzone(event, ControllerInput.rightAxis(event, false));
 
         // Gachettes analogiques (si la manette n'envoie pas de touches L2/R2)
         if (!triggerKeys) {

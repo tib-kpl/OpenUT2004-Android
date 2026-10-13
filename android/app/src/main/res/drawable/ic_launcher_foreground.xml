@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icone originale : viseur stylise (aucun element graphique du jeu) -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <!-- anneau -->
-    <path android:strokeColor="#FFFF7A1A" android:strokeWidth="4" android:fillColor="#00000000"
-        android:pathData="M54,32 a22,22 0 1,0 0.01,0 Z"/>
-    <!-- graduations -->
-    <path android:fillColor="#FFFF7A1A" android:pathData="M52,22 h4 v12 h-4 Z"/>
-    <path android:fillColor="#FFFF7A1A" android:pathData="M52,74 h4 v12 h-4 Z"/>
-    <path android:fillColor="#FFFF7A1A" android:pathData="M22,52 h12 v4 h-12 Z"/>
-    <path android:fillColor="#FFFF7A1A" android:pathData="M74,52 h12 v4 h-12 Z"/>
-    <!-- point central -->
-    <path android:fillColor="#FFFFD27A" android:pathData="M54,50 a4,4 0 1,0 0.01,0 Z"/>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:fillColor="#00000000" android:pathData="M54,24 A30,30 0,1 1,53.99 24 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M29,37 L43,35 L42,43 L42,58 Q42,66 51,65 Q58,64 60,56 L61,40 L58,36 L74,32 L68,41 L68,59 Q62,71 51,73 L47,77 L43,72 L36,71 L39,67 Q33,62 34,54 L35,42 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M51,21 L54,16 L57,24 M82,51 L91,54 L83,58 M51,84 L54,92 L57,83 M25,51 L17,54 L26,58" />
 </vector>

@@ -48,6 +48,7 @@ public class GameActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ControllerSettings.init(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             getWindow().getAttributes().layoutInDisplayCutoutMode =
@@ -202,8 +203,8 @@ public class GameActivity extends Activity {
     }
 
     private void openSettings() {
-        startActivity(new Intent(this, LauncherActivity.class).setAction(LauncherActivity.ACTION_SETTINGS)
-                .putExtra(LauncherActivity.EXTRA_RETURN_TO_GAME, true));
+        startActivityForResult(new Intent(this, LauncherActivity.class).setAction(LauncherActivity.ACTION_SETTINGS)
+                .putExtra(LauncherActivity.EXTRA_RETURN_TO_GAME, true), 101);
     }
 
     /** Explicit mode: UT2004 also captures the mouse in some menu screens. */
@@ -211,7 +212,16 @@ public class GameActivity extends Activity {
         inputMode = new Button(this);
         inputMode.setText(R.string.input_mode_menu);
         inputMode.setTextSize(11);
-        inputMode.setAlpha(0.7f);
+        inputMode.setAlpha(1f);
+        inputMode.setTextColor(0xccffffff);
+        inputMode.setIncludeFontPadding(false);
+        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable();
+        background.setColor(0x55333333);
+        background.setCornerRadius(6 * getResources().getDisplayMetrics().density);
+        inputMode.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x33ffffff), background, null));
+        inputMode.setStateListAnimator(null);
+        inputMode.setElevation(0);
         inputMode.setFocusable(false);
         inputMode.setAllCaps(false);
         inputMode.setMinimumHeight(0);
@@ -221,7 +231,7 @@ public class GameActivity extends Activity {
         int gap = Math.round(8 * getResources().getDisplayMetrics().density);
         inputMode.setPadding(gap, gap / 2, gap, gap / 2);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                gap * 17, gap * 6, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         lp.setMargins(0, gap, 0, 0);
         root.addView(inputMode, lp);
         inputMode.setOnClickListener(v -> toggleInputMode());
@@ -260,6 +270,12 @@ public class GameActivity extends Activity {
                 input == null || input.isMenuMode() ? R.string.input_mode_menu : R.string.input_mode_game));
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101 && resultCode == Activity.RESULT_FIRST_USER) recreate();
+    }
+
     private void addFpsCounter() {
         TextView fps = new TextView(this);
         fpsCounter = fps;
@@ -290,10 +306,21 @@ public class GameActivity extends Activity {
     private void openGameKeyboard() {
         EditText text = new EditText(this);
         text.setSingleLine(true);
+        text.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.input_text_title).setView(text)
                 .setPositiveButton(R.string.input_text_send, (d, which) -> input.sendText(text.getText().toString()))
                 .setNegativeButton(android.R.string.cancel, null).create();
+        text.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND
+                    || actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                input.sendText(text.getText().toString());
+                dialog.dismiss();
+                return true;
+            }
+            return false;
+        });
         dialog.setOnShowListener(d -> {
             text.requestFocus();
             dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
@@ -303,7 +330,7 @@ public class GameActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        int keyCode = event.getKeyCode();
+        int keyCode = ControllerInput.key(event);
         if (input != null && input.isMenuMode() && keyCode == KeyEvent.KEYCODE_BUTTON_Y) {
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) openGameKeyboard();
             return true;

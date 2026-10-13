@@ -64,4 +64,6 @@
         <item>720p · équilibre</item>
         <item>1080p · netteté</item>
     </string-array>
+    <string name="btn_restart_game">Redémarrer le jeu</string>
+    <string name="btn_controller">Configurer la manette</string>
 </resources>

@@ -42,6 +42,7 @@ public class LauncherActivity extends Activity {
     private TextView status;
     private ProgressBar progress;
     private Button playButton;
+    private Button restartButton;
     private Button downloadButton;
     private Button pickButton;
     private Button resolutionButton;
@@ -67,6 +68,8 @@ public class LauncherActivity extends Activity {
         status = findViewById(R.id.status);
         progress = findViewById(R.id.progress);
         playButton = findViewById(R.id.play);
+        restartButton = findViewById(R.id.restart);
+        restartButton.setOnClickListener(v -> { setResult(Activity.RESULT_FIRST_USER); finish(); });
         downloadButton = findViewById(R.id.download);
         pickButton = findViewById(R.id.pick);
         resolutionButton = findViewById(R.id.resolution);
@@ -74,6 +77,7 @@ public class LauncherActivity extends Activity {
         downloadButton.setOnClickListener(v -> confirmDownload());
         pickButton.setOnClickListener(v -> openPicker(REQ_PICK_GAME));
         resolutionButton.setOnClickListener(v -> openGraphicsSettings());
+        findViewById(R.id.controller).setOnClickListener(v -> ControllerSettings.show(this));
         updateResolutionButton();
         forcePick = ACTION_CHANGE_FOLDER.equals(getIntent().getAction())
                 || ACTION_SETTINGS.equals(getIntent().getAction());
@@ -162,6 +166,7 @@ public class LauncherActivity extends Activity {
 
     private void setButtons(boolean play, boolean download, boolean pick) {
         playButton.setVisibility(play ? View.VISIBLE : View.GONE);
+        restartButton.setVisibility(play && getIntent().getBooleanExtra(EXTRA_RETURN_TO_GAME, false) ? View.VISIBLE : View.GONE);
         downloadButton.setVisibility(View.VISIBLE);
         downloadButton.setEnabled(download);
         pickButton.setVisibility(View.VISIBLE);

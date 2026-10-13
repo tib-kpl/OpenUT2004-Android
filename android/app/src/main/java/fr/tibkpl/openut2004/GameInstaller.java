@@ -139,7 +139,7 @@ final class GameInstaller {
             JSONArray assets = release.getJSONArray("assets");
             for (int i = 0; i < assets.length(); i++) {
                 String name = assets.getJSONObject(i).getString("name");
-                if (name.contains("-Linux") && name.endsWith(".tar.bz2")) asset = assets.getJSONObject(i);
+                if (name.contains("-Linux") && !name.contains("-SDK-") && name.endsWith(".tar.bz2")) asset = assets.getJSONObject(i);
             }
             if (asset == null) throw new IOException("Patch Linux absent de la release " + tag);
             url = asset.getString("browser_download_url");

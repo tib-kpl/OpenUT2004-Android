@@ -48,7 +48,7 @@ To change the game folder later: **long-press the icon → "Changer le dossier d
 The gamepad is translated to keyboard and mouse controls. It starts in **Menus** mode.
 The mode follows the engine's GUI state. **Select** (or the small mode button) remains a
 manual override until the next GUI transition. The centered button displays Mouse ON/OFF
-in the selected game language, with a large touch target and smaller text.
+in the selected game language, with a compact translucent button and small text.
 
 In Menus mode, the right stick moves the cursor more slowly, R2 clicks, A sends Enter,
 B goes back, X sends Tab to focus the next control, and the D-pad moves between controls
@@ -61,7 +61,7 @@ The settings gear pauses the current session. **Retour au jeu** resumes it witho
 restarting the engine. Graphics changes apply on the next launch; the settings provide
 automatic GPU selection, integrated Vulkan Turnip, software rendering for troubleshooting,
 540p/720p/1080p, and an optional counter that measures engine frames rather than screen refreshes.
-Toggle it in **Graphismes ? Afficher les FPS du moteur**; the visibility changes immediately
+Toggle it in **Graphismes > Afficher les FPS du moteur**; the visibility changes immediately
 when returning to the running session.
 
 In Game mode:
@@ -151,3 +151,11 @@ cd android && ./gradlew assembleRelease
   7-Zip, unshield…) and Mesa built from source, each under its own license.
 - License details and source code access: [THIRD_PARTY.md](THIRD_PARTY.md).
 - OpenUT2004's icon and artwork are original creations of this project.
+
+### Language, audio and restart
+
+The launcher offers both **Retour au jeu** (resume the existing session) and **Redemarrer le jeu** (apply engine language and graphics changes). The compact mouse toggle has a translucent background. **Configurer la manette** stores per-device button mappings and right-stick axis choices. Controller detection accepts generic Android gamepad buttons and alternate right-stick axes; device-specific validation is still needed for AYN Thor.
+
+French voice audio requires the localized `Sounds/*.frt_uax` files in addition to French UI text. The English OldUnreal installation media does not include those voices. They can be obtained from the [DXM French patch](https://www.dxm.be/navigator.php5?content=216&lang=fr) and placed alongside the original `.uax` files. The launcher sets the engine language to `frt` when French is selected. Voice data is not bundled in the APK or this repository.
+
+Launcher artwork and the colored app icon are original generated fan art inspired by the game.

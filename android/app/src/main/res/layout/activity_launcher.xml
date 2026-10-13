@@ -12,7 +12,7 @@
         android:layout_weight="1"
         android:adjustViewBounds="true"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/art_launcher" />
+        android:src="@drawable/art_launcher_fanart" />
 
     <ScrollView
         android:layout_width="0dp"
@@ -67,6 +67,14 @@
             android:visibility="gone" />
 
         <Button
+            android:id="@+id/restart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_restart_game"
+            android:visibility="gone" />
+
+        <Button
             android:id="@+id/download"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -85,6 +93,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/controller"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_controller" />
 
         <Button
             android:id="@+id/pick"
