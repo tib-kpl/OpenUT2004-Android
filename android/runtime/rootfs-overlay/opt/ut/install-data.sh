@@ -27,7 +27,8 @@ mkdir -p "$STAGE/Cabs" "$STAGE/Data"
 for disk in "$STAGE"/Disk*; do
     [ -d "$disk" ] || continue
     for f in "$disk"/*.cab "$disk"/*.hdr; do
-        [ -f "$f" ] && ln -sf "$f" "$STAGE/Cabs/$(basename "$f")"
+        # deplacement (pas de lien : les cartes SD n'en acceptent pas)
+        [ -f "$f" ] && mv -f "$f" "$STAGE/Cabs/$(basename "$f")"
     done
 done
 total=$(unshield -d "$STAGE/Data" l "$STAGE/Cabs/data1.cab" | tail -n 1 | awk '{print $1}')
