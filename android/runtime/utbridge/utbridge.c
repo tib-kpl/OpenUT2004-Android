@@ -1,21 +1,24 @@
 /*
  * utbridge - charge via LD_PRELOAD dans le moteur UT2004 (runtime Linux de l'appli Android).
  *
- * - Entrees : recoit de l'appli des evenements clavier/souris sur une socket TCP locale
- *   (port UT_INPUT_PORT) et les injecte dans l'ecran X virtuel (Xvfb) avec l'extension
- *   XTest. Le moteur les recoit comme un vrai clavier et une vraie souris, en jeu comme
- *   dans les menus (la manette est convertie en clavier/souris cote appli).
+ * - Clavier : recu de l'appli sur une socket TCP locale (port UT_INPUT_PORT) et injecte dans
+ *   l'ecran X virtuel (Xvfb) avec l'extension XTest.
+ * - Souris : injectee directement dans la file d'evenements SDL3 du moteur (mouvements,
+ *   boutons, molette). En mode "souris relative" (jeux de tir), SDL3 ignore les mouvements
+ *   simules par XTest.
+ *   (La manette est convertie en clavier/souris cote appli.)
  * - Pause : quand l'appli passe en arriere-plan, la boucle du jeu est bloquee a la fin de
  *   l'image en cours (SDL_GL_SwapWindow).
  * - Journal : stderr et, si UT_LOG_DIR est defini, <UT_LOG_DIR>/utbridge.log.
  *
  * Messages de 8 octets, little-endian : uint8 type, uint8 reserve, uint16 code, int32 valeur
  *   type 1 = touche   (code = keysym X11, valeur 1 appuyee / 0 relachee)
- *   type 2 = bouton   (code = bouton souris X11 1..5, valeur 1/0)
+ *   type 2 = bouton   (code = bouton souris X11 : 1 gauche, 2 milieu, 3 droit, 4/5 molette)
  *   type 3 = souris   (valeur = dx sur les 16 bits bas, dy sur les 16 bits hauts, signes)
  *   type 4 = pause    (valeur 1 pause / 0 reprise)
  */
 #define _GNU_SOURCE
+#include <SDL3/SDL.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/XTest.h>
 #include <arpa/inet.h>
@@ -24,7 +27,6 @@
 #include <netinet/tcp.h>
 #include <pthread.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +43,11 @@ static int paused;
 static pthread_mutex_t pause_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t pause_cond = PTHREAD_COND_INITIALIZER;
 static FILE *logf;
+
+/* Fenetre du moteur (memorisee a chaque image) et position absolue de la souris */
+static SDL_Window *volatile game_window;
+static volatile int window_w = 1280, window_h = 720;
+static float mouse_x = -1, mouse_y = -1;
 
 static void logmsg(const char *fmt, ...)
 {
@@ -76,40 +83,89 @@ static int read_full(int fd, void *buf, size_t len)
     return 0;
 }
 
+static SDL_WindowID window_id(void)
+{
+    SDL_Window *w = game_window;
+    return w ? SDL_GetWindowID(w) : 0;
+}
+
+static void push_motion(int dx, int dy)
+{
+    SDL_Event ev;
+    if (mouse_x < 0) {
+        mouse_x = window_w / 2.0f;
+        mouse_y = window_h / 2.0f;
+    }
+    mouse_x = SDL_clamp(mouse_x + dx, 0, window_w - 1);
+    mouse_y = SDL_clamp(mouse_y + dy, 0, window_h - 1);
+    SDL_zero(ev);
+    ev.motion.type = SDL_EVENT_MOUSE_MOTION;
+    ev.motion.timestamp = SDL_GetTicksNS();
+    ev.motion.windowID = window_id();
+    ev.motion.which = 1;
+    ev.motion.x = mouse_x;
+    ev.motion.y = mouse_y;
+    ev.motion.xrel = (float)dx;
+    ev.motion.yrel = (float)dy;
+    SDL_PushEvent(&ev);
+}
+
+static void push_button(int x11_button, int down)
+{
+    SDL_Event ev;
+    if (mouse_x < 0) {
+        mouse_x = window_w / 2.0f;
+        mouse_y = window_h / 2.0f;
+    }
+    SDL_zero(ev);
+    if (x11_button == 4 || x11_button == 5) { /* molette : evenement a l'appui seulement */
+        if (!down) return;
+        ev.wheel.type = SDL_EVENT_MOUSE_WHEEL;
+        ev.wheel.timestamp = SDL_GetTicksNS();
+        ev.wheel.windowID = window_id();
+        ev.wheel.which = 1;
+        ev.wheel.y = x11_button == 4 ? 1.0f : -1.0f;
+        ev.wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+        ev.wheel.mouse_x = mouse_x;
+        ev.wheel.mouse_y = mouse_y;
+    } else {
+        ev.button.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+        ev.button.timestamp = SDL_GetTicksNS();
+        ev.button.windowID = window_id();
+        ev.button.which = 1;
+        ev.button.button = x11_button == 1 ? SDL_BUTTON_LEFT
+                         : x11_button == 2 ? SDL_BUTTON_MIDDLE : SDL_BUTTON_RIGHT;
+        ev.button.down = down ? true : false;
+        ev.button.clicks = 1;
+        ev.button.x = mouse_x;
+        ev.button.y = mouse_y;
+    }
+    SDL_PushEvent(&ev);
+}
+
 static void handle(Display *dpy, uint8_t type, uint16_t code, int32_t value)
 {
-    static int count;
-    if (count < 50 && type != MSG_MOTION) {
-        count++;
-        logmsg("utbridge: evenement type=%u code=0x%x valeur=%d\n", type, code, value);
-    }
     switch (type) {
     case MSG_KEY: {
         KeyCode kc = XKeysymToKeycode(dpy, (KeySym)code);
-        if (kc) XTestFakeKeyEvent(dpy, kc, value ? True : False, CurrentTime);
-        else logmsg("utbridge: keysym 0x%x sans keycode\n", code);
-        break;
-    }
-    case MSG_BUTTON:
-        XTestFakeButtonEvent(dpy, code, value ? True : False, CurrentTime);
-        break;
-    case MSG_MOTION: {
-        static int motions;
-        XTestFakeRelativeMotionEvent(dpy, (int16_t)(value & 0xffff), (int16_t)((uint32_t)value >> 16), CurrentTime);
-        if (++motions % 200 == 0) { /* diagnostic : position du pointeur X */
-            Window root, child;
-            int rx, ry, wx, wy;
-            unsigned int mask;
-            XQueryPointer(dpy, DefaultRootWindow(dpy), &root, &child, &rx, &ry, &wx, &wy, &mask);
-            logmsg("utbridge: %d mouvements, pointeur X en %d,%d\n", motions, rx, ry);
+        if (kc) {
+            XTestFakeKeyEvent(dpy, kc, value ? True : False, CurrentTime);
+            XFlush(dpy);
+        } else {
+            logmsg("utbridge: keysym 0x%x sans keycode\n", code);
         }
         break;
     }
+    case MSG_BUTTON:
+        push_button(code, value);
+        break;
+    case MSG_MOTION:
+        push_motion((int16_t)(value & 0xffff), (int16_t)((uint32_t)value >> 16));
+        break;
     case MSG_PAUSE:
         set_paused(value);
-        return;
+        break;
     }
-    XFlush(dpy);
 }
 
 static void *input_thread(void *arg)
@@ -117,7 +173,6 @@ static void *input_thread(void *arg)
     const char *port_env = getenv("UT_INPUT_PORT");
     int port = port_env ? atoi(port_env) : 0;
     Display *dpy = NULL;
-    int major, minor, event, error;
     (void)arg;
     if (port <= 0) return NULL;
 
@@ -126,11 +181,6 @@ static void *input_thread(void *arg)
     if (!dpy) {
         logmsg("utbridge: ecran X introuvable (DISPLAY=%s)\n", getenv("DISPLAY") ? getenv("DISPLAY") : "");
         return NULL;
-    }
-    if (!XTestQueryExtension(dpy, &event, &error, &major, &minor)) {
-        logmsg("utbridge: extension XTest absente\n");
-    } else {
-        logmsg("utbridge: XTest %d.%d\n", major, minor);
     }
 
     for (;;) {
@@ -178,47 +228,28 @@ static void bridge_start(void)
     if (pthread_create(&thread, NULL, input_thread, NULL) == 0) pthread_detach(thread);
 }
 
-/* SDL3 : bool SDL_Init(SDL_InitFlags) */
-bool SDL_Init(uint32_t flags)
+bool SDL_Init(SDL_InitFlags flags)
 {
-    static bool (*real_init)(uint32_t);
-    if (!real_init) real_init = (bool (*)(uint32_t))dlsym(RTLD_NEXT, "SDL_Init");
+    static bool (*real_init)(SDL_InitFlags);
+    if (!real_init) real_init = (bool (*)(SDL_InitFlags))dlsym(RTLD_NEXT, "SDL_Init");
     bridge_start();
     return real_init(flags);
 }
 
-/* Diagnostic : lecture de la souris par le moteur (SDL3 : uint32 f(float *x, float *y)) */
-uint32_t SDL_GetRelativeMouseState(float *x, float *y)
+bool SDL_GL_SwapWindow(SDL_Window *window)
 {
-    static uint32_t (*real)(float *, float *);
-    static int calls;
-    uint32_t ret;
-    if (!real) real = (uint32_t (*)(float *, float *))dlsym(RTLD_NEXT, "SDL_GetRelativeMouseState");
-    ret = real(x, y);
-    if (++calls % 600 == 1 || (x && y && (*x != 0 || *y != 0) && calls % 30 == 0)) {
-        logmsg("utbridge: GetRelativeMouseState #%d -> %.1f,%.1f\n", calls, x ? *x : 0.f, y ? *y : 0.f);
-    }
-    return ret;
-}
-
-uint32_t SDL_GetMouseState(float *x, float *y)
-{
-    static uint32_t (*real)(float *, float *);
-    static int calls;
-    uint32_t ret;
-    if (!real) real = (uint32_t (*)(float *, float *))dlsym(RTLD_NEXT, "SDL_GetMouseState");
-    ret = real(x, y);
-    if (++calls % 600 == 1) logmsg("utbridge: GetMouseState #%d -> %.1f,%.1f\n", calls, x ? *x : 0.f, y ? *y : 0.f);
-    return ret;
-}
-
-/* SDL3 : bool SDL_GL_SwapWindow(SDL_Window *) */
-bool SDL_GL_SwapWindow(void *window)
-{
-    static bool (*real_swap)(void *);
+    static bool (*real_swap)(SDL_Window *);
     bool ret;
-    if (!real_swap) real_swap = (bool (*)(void *))dlsym(RTLD_NEXT, "SDL_GL_SwapWindow");
+    int w, h;
+    if (!real_swap) real_swap = (bool (*)(SDL_Window *))dlsym(RTLD_NEXT, "SDL_GL_SwapWindow");
     ret = real_swap(window);
+    if (window != game_window) {
+        game_window = window;
+        if (SDL_GetWindowSize(window, &w, &h) && w > 0 && h > 0) {
+            window_w = w;
+            window_h = h;
+        }
+    }
     pthread_mutex_lock(&pause_lock);
     while (paused) pthread_cond_wait(&pause_cond, &pause_lock);
     pthread_mutex_unlock(&pause_lock);
