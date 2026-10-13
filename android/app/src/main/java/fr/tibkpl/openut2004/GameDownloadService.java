@@ -63,6 +63,7 @@ public class GameDownloadService extends Service {
 
     static final State STATE = new State();
 
+    private static volatile boolean workerActive;
     private Thread worker;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
@@ -77,7 +78,10 @@ public class GameDownloadService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String dest = intent == null ? null : intent.getStringExtra(EXTRA_DEST);
         startForegroundCompat(notification(getString(R.string.download_preparing), -1));
-        if (dest == null || STATE.running) return START_NOT_STICKY;
+        // Indicateur propre au service (STATE.running est aussi positionne par l'ecran d'accueil
+        // pour afficher la progression sans attendre)
+        if (dest == null || workerActive) return START_NOT_STICKY;
+        workerActive = true;
 
         STATE.running = true;
         STATE.finished = false;
@@ -94,6 +98,7 @@ public class GameDownloadService extends Service {
                 Log.e(TAG, "Installation", e);
                 STATE.error = e.getMessage();
             } finally {
+                workerActive = false;
                 STATE.running = false;
                 STATE.finished = true;
                 releaseLocks();
