@@ -39,8 +39,10 @@ final class GameRuntime {
         return new File(config.rootfsDir, "tmp/audio.fifo");
     }
 
+    /** Journal du moteur, dans Android/data/<appli>/files (lisible pour les rapports de bug). */
     File logFile() {
-        return new File(context.getFilesDir(), "ut2004.log");
+        File dir = context.getExternalFilesDir(null);
+        return new File(dir != null ? dir : context.getFilesDir(), "ut2004.log");
     }
 
     /**
@@ -56,12 +58,14 @@ final class GameRuntime {
         binds.add(config.gameRoot.getAbsolutePath() + ":/game");
         binds.add(config.patchDir.getAbsolutePath() + ":" + GameInstaller.PATCH_MOUNT);
         binds.add(config.homeDir.getAbsolutePath() + ":/home/ut");
+        binds.add(logFile().getParentFile().getAbsolutePath() + ":/logs");
         List<String> env = new ArrayList<>();
         env.add("HOME=/home/ut");
         env.add("UT_WIDTH=" + width);
         env.add("UT_HEIGHT=" + height);
         env.add("UT_INPUT_PORT=" + inputPort);
         env.add("UT_RENDERER=" + (gpu ? "gpu" : "software"));
+        env.add("UT_LOG_DIR=/logs");
         ProcessBuilder pb = proot(context, config.rootfsDir, binds, env, "/game", "/opt/ut/run.sh");
         pb.redirectErrorStream(true);
         pb.redirectOutput(logFile());

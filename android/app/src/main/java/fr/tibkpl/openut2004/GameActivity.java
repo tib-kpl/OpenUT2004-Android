@@ -87,7 +87,7 @@ public class GameActivity extends Activity {
         try {
             audio = new AudioBridge(runtime.audioFifo());
             audio.start();
-            InputBridge.debug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+            InputBridge.debug = true; // TODO : retirer une fois la manette validee
             input = new InputBridge();
 
             Point screen = screenSize();

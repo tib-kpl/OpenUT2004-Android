@@ -7,6 +7,7 @@
  *   dans les menus (la manette est convertie en clavier/souris cote appli).
  * - Pause : quand l'appli passe en arriere-plan, la boucle du jeu est bloquee a la fin de
  *   l'image en cours (SDL_GL_SwapWindow).
+ * - Journal : stderr et, si UT_LOG_DIR est defini, <UT_LOG_DIR>/utbridge.log.
  *
  * Messages de 8 octets, little-endian : uint8 type, uint8 reserve, uint16 code, int32 valeur
  *   type 1 = touche   (code = keysym X11, valeur 1 appuyee / 0 relachee)
@@ -22,6 +23,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -38,6 +40,21 @@
 static int paused;
 static pthread_mutex_t pause_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t pause_cond = PTHREAD_COND_INITIALIZER;
+static FILE *logf;
+
+static void logmsg(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    if (logf) {
+        va_start(ap, fmt);
+        vfprintf(logf, fmt, ap);
+        va_end(ap);
+        fflush(logf);
+    }
+}
 
 static void set_paused(int value)
 {
@@ -61,10 +78,16 @@ static int read_full(int fd, void *buf, size_t len)
 
 static void handle(Display *dpy, uint8_t type, uint16_t code, int32_t value)
 {
+    static int count;
+    if (count < 50 && type != MSG_MOTION) {
+        count++;
+        logmsg("utbridge: evenement type=%u code=0x%x valeur=%d\n", type, code, value);
+    }
     switch (type) {
     case MSG_KEY: {
         KeyCode kc = XKeysymToKeycode(dpy, (KeySym)code);
         if (kc) XTestFakeKeyEvent(dpy, kc, value ? True : False, CurrentTime);
+        else logmsg("utbridge: keysym 0x%x sans keycode\n", code);
         break;
     }
     case MSG_BUTTON:
@@ -85,14 +108,20 @@ static void *input_thread(void *arg)
     const char *port_env = getenv("UT_INPUT_PORT");
     int port = port_env ? atoi(port_env) : 0;
     Display *dpy = NULL;
+    int major, minor, event, error;
     (void)arg;
     if (port <= 0) return NULL;
 
     /* Xvfb est demarre avant le moteur, mais on reessaie au cas ou */
     for (int i = 0; i < 100 && !(dpy = XOpenDisplay(NULL)); i++) usleep(100 * 1000);
     if (!dpy) {
-        fprintf(stderr, "utbridge: ecran X introuvable\n");
+        logmsg("utbridge: ecran X introuvable (DISPLAY=%s)\n", getenv("DISPLAY") ? getenv("DISPLAY") : "");
         return NULL;
+    }
+    if (!XTestQueryExtension(dpy, &event, &error, &major, &minor)) {
+        logmsg("utbridge: extension XTest absente\n");
+    } else {
+        logmsg("utbridge: XTest %d.%d\n", major, minor);
     }
 
     for (;;) {
@@ -106,13 +135,14 @@ static void *input_thread(void *arg)
             int one = 1;
             uint8_t msg[8];
             setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-            fprintf(stderr, "utbridge: entrees connectees (port %d)\n", port);
+            logmsg("utbridge: entrees connectees (port %d)\n", port);
             while (read_full(fd, msg, sizeof(msg)) == 0) {
                 uint16_t code = (uint16_t)(msg[2] | (msg[3] << 8));
                 int32_t value = (int32_t)((uint32_t)msg[4] | ((uint32_t)msg[5] << 8) |
                                           ((uint32_t)msg[6] << 16) | ((uint32_t)msg[7] << 24));
                 handle(dpy, msg[0], code, value);
             }
+            logmsg("utbridge: entrees deconnectees\n");
         }
         if (fd >= 0) close(fd);
         set_paused(0); /* appli deconnectee : ne jamais rester bloque */
@@ -125,10 +155,17 @@ __attribute__((constructor)) static void utbridge_init(void)
 {
     char exe[4096];
     pthread_t thread;
+    const char *dir = getenv("UT_LOG_DIR");
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
     if (n <= 0) return;
     exe[n] = '\0';
     if (!strstr(exe, "ut2004-bin")) return; /* uniquement le moteur (pas Xvfb, sh...) */
+    if (dir) {
+        char path[4096];
+        snprintf(path, sizeof(path), "%s/utbridge.log", dir);
+        logf = fopen(path, "w");
+    }
+    logmsg("utbridge: charge dans %s (port %s)\n", exe, getenv("UT_INPUT_PORT") ? getenv("UT_INPUT_PORT") : "?");
     XInitThreads();
     if (pthread_create(&thread, NULL, input_thread, NULL) == 0) pthread_detach(thread);
 }

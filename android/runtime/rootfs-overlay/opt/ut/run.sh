@@ -40,6 +40,13 @@ if [ "$UT_RENDERER" = "gpu" ] && [ -d /opt/turnip ] && [ -r /dev/kgsl-3d0 ]; the
     export XDG_RUNTIME_DIR=/tmp
 fi
 
+# Journal du moteur dans le dossier lisible de l'appli (UT_LOG_DIR, rapports de bug)
+if [ -n "$UT_LOG_DIR" ]; then
+    mkdir -p "$HOME/.ut2004/System"
+    rm -f "$HOME/.ut2004/System/UT2004.log"
+    ln -s "$UT_LOG_DIR/UT2004.log" "$HOME/.ut2004/System/UT2004.log"
+fi
+
 ./ut2004-bin-arm64 "$@"
 STATUS=$?
 

@@ -117,7 +117,9 @@ public class LauncherActivity extends Activity {
         File gameDir = saved == null ? null : GameData.findGameDir(new File(saved));
         boolean justInstalled = dl.finished && dl.error == null && dl.gameDir != null;
 
-        if (gameDir != null && !forcePick && pickError == null && !justInstalled) {
+        // Jeu present : lancement direct (y compris juste apres le telechargement)
+        if (gameDir != null && !forcePick && pickError == null) {
+            dl.finished = false;
             launchGame(gameDir);
             return;
         }

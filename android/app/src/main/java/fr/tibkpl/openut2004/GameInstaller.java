@@ -63,6 +63,8 @@ final class GameInstaller {
 
     /** Point de montage du patch dans le runtime (cible des liens de files/game). */
     static final String PATCH_MOUNT = "/patch";
+    /** Dossier du moteur arm64 dans le patch OldUnreal. */
+    private static final String ENGINE_DIR = "SystemARM64";
 
     private static final String ASSET_ROOTFS = "runtime/rootfs.tgz";
     private static final String KEY_RUNTIME_VERSION = "runtime_version";
@@ -203,8 +205,12 @@ final class GameInstaller {
      * vers les chemins vus dans le runtime (/storage/... et /patch/...).
      */
     static void buildGameRoot(File dataDir, File patchDir, File gameRoot) throws IOException {
-        deleteRecursively(gameRoot);
+        // Tout est recree sauf le dossier du moteur, recopie seulement si le patch change
+        File engineDir = new File(gameRoot, ENGINE_DIR);
+        File[] old = gameRoot.listFiles();
+        if (old != null) for (File f : old) if (!f.getName().equals(ENGINE_DIR)) deleteRecursively(f);
         mkdirs(gameRoot);
+        installEngineDir(new File(patchDir, ENGINE_DIR), engineDir);
 
         Map<String, File> patchEntries = new HashMap<>();
         File[] patchFiles = patchDir.listFiles();
@@ -229,9 +235,53 @@ final class GameInstaller {
                 overlay(patch, PATCH_MOUNT + "/" + patch.getName(), target);
             }
         }
-        // Dossiers propres au patch (SystemARM64 : moteur arm64, SystemLocalized...)
+        // Autres dossiers propres au patch (SystemLocalized...)
         for (File patch : patchEntries.values()) {
+            if (patch.getName().equals(ENGINE_DIR)) continue;
             symlink(PATCH_MOUNT + "/" + patch.getName(), new File(gameRoot, patch.getName()));
+        }
+    }
+
+    /**
+     * Le moteur tourne depuis /game/SystemARM64 et trouve ses donnees en ../Maps, ../Help... :
+     * ce dossier doit etre un vrai dossier de /game (si c'etait un lien vers /patch, ".."
+     * designerait /patch). Copie du patch, refaite seulement quand le patch change.
+     */
+    private static void installEngineDir(File src, File dest) throws IOException {
+        File marker = new File(dest, ".openut2004-version");
+        String version = new String(Files.readAllBytes(
+                new File(src.getParentFile(), "OPENUT2004_PATCH_VERSION").toPath()), StandardCharsets.UTF_8);
+        if (!marker.isFile() || !version.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8))) {
+            deleteRecursively(dest);
+            copyTree(src, dest);
+            Files.write(marker.toPath(), version.getBytes(StandardCharsets.UTF_8));
+        }
+        // Le moteur cherche Packages.md5 dans son propre dossier ; le patch le fournit dans
+        // System/ (et SystemPPC64LE/) mais pas dans SystemARM64/
+        File md5 = new File(dest, "Packages.md5");
+        File patchMd5 = new File(src.getParentFile(), "System/Packages.md5");
+        if (!md5.exists() && patchMd5.isFile()) Files.copy(patchMd5.toPath(), md5.toPath());
+    }
+
+    /** Copie recursive en conservant liens symboliques et droits (executables). */
+    private static void copyTree(File src, File dest) throws IOException {
+        mkdirs(dest);
+        File[] children = src.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            File target = new File(dest, child.getName());
+            if (Files.isSymbolicLink(child.toPath())) {
+                symlink(Files.readSymbolicLink(child.toPath()).toString(), target);
+            } else if (child.isDirectory()) {
+                copyTree(child, target);
+            } else {
+                Files.copy(child.toPath(), target.toPath());
+                try {
+                    Os.chmod(target.getPath(), Os.stat(child.getPath()).st_mode & 0777);
+                } catch (ErrnoException e) {
+                    throw new IOException("chmod " + target, e);
+                }
+            }
         }
     }
 
@@ -295,9 +345,15 @@ final class GameInstaller {
         }
         Ini.set(lines, "Engine.Engine", "RenderDevice", "OpenGLDrv.OpenGLRenderDevice");
         Ini.set(lines, "Engine.Engine", "AudioDevice", "ALAudio.ALAudioSubsystem");
-        Ini.set(lines, "SDLDrv.SDLClient", "FullscreenViewportX", Integer.toString(width));
-        Ini.set(lines, "SDLDrv.SDLClient", "FullscreenViewportY", Integer.toString(height));
-        Ini.set(lines, "SDLDrv.SDLClient", "StartupFullscreen", "True");
+        // Toutes les tailles a la resolution choisie : l'image remplit l'ecran X virtuel meme si
+        // le moteur demarre en mode fenetre (pas de gestionnaire de fenetres, fenetre en 0,0)
+        for (String section : new String[]{"SDLDrv.SDLClient", "WinDrv.WindowsClient"}) {
+            for (String mode : new String[]{"Fullscreen", "Windowed", "Menu"}) {
+                Ini.set(lines, section, mode + "ViewportX", Integer.toString(width));
+                Ini.set(lines, section, mode + "ViewportY", Integer.toString(height));
+            }
+            Ini.set(lines, section, "StartupFullscreen", "True");
+        }
         Ini.set(lines, "SDLDrv.SDLClient", "UseJoystick", "False");
         Ini.set(lines, "Engine.GameEngine", "MainMenuClass", "GUI2K4.UT2K4MainMenuWS");
         mkdirs(ini.getParentFile());
