@@ -145,9 +145,14 @@ public class GameDownloadService extends Service {
         if (!downloaded) throw lastError != null ? lastError : new IOException("Telechargement impossible");
 
         // 2. Extraction dans le runtime Linux (7-Zip + unshield), voir /opt/ut/install-data.sh
-        List<String> env = new ArrayList<>();
-        ProcessBuilder pb = GameRuntime.proot(this, rootfs, new ArrayList<>(), env, "/",
-                "/opt/ut/install-data.sh", iso.getAbsolutePath(), dest.getAbsolutePath());
+        // Archives intermediaires dans la memoire interne de l'appli (rapide, hors stockage
+        // partage) : les ecrire sur la carte SD saturait la memoire et Android tuait l'appli.
+        File work = new File(getCacheDir(), "ut-install");
+        GameInstaller.mkdirs(work);
+        List<String> binds = new ArrayList<>();
+        binds.add(work.getAbsolutePath() + ":/work");
+        ProcessBuilder pb = GameRuntime.proot(this, rootfs, binds, new ArrayList<>(), "/",
+                "/opt/ut/install-data.sh", iso.getAbsolutePath(), dest.getAbsolutePath(), "/work");
         pb.redirectErrorStream(true);
         Process process = pb.start();
         StringBuilder log = new StringBuilder();
@@ -168,6 +173,7 @@ public class GameDownloadService extends Service {
             }
         }
         int code = process.waitFor();
+        GameInstaller.deleteRecursively(work);
         if (code != 0) throw new IOException("Extraction echouee (code " + code + ")\n" + log);
 
         // 3. L'ISO (et un eventuel partiel d'une autre source) n'est plus utile

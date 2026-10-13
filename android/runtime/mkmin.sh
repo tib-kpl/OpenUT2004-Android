@@ -25,7 +25,7 @@ copy() { # copie un chemin (et la cible s'il s'agit d'un lien) en preservant l'a
 # Binaires utilises par run.sh, install-data.sh et proot
 BINS="/usr/bin/dash /usr/bin/sh /usr/bin/env /usr/bin/mkdir /usr/bin/rm /usr/bin/sleep \
 /usr/bin/cat /usr/bin/ls /usr/bin/cp /usr/bin/mv /usr/bin/ln /usr/bin/basename /usr/bin/tail \
-/usr/bin/tr /usr/bin/sed /usr/bin/mawk /usr/bin/awk /usr/bin/7z /usr/bin/unshield \
+/usr/bin/tr /usr/bin/sed /usr/bin/mawk /usr/bin/awk /usr/bin/7z /usr/bin/unshield /usr/bin/nice /usr/bin/sync \
 /usr/bin/Xvfb /usr/bin/xkbcomp"
 
 # Bibliotheques chargees par dlopen (absentes de ldd) + celles du moteur (SDL3 et OpenAL,
