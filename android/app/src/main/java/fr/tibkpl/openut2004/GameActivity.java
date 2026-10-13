@@ -26,6 +26,8 @@ import java.io.File;
 public class GameActivity extends Activity {
 
     static final String EXTRA_GAME_DIR = "game_dir";
+    /** Nouvel essai en rendu logiciel apres un echec au demarrage en rendu GPU. */
+    static final String EXTRA_SOFTWARE_RETRY = "software_retry";
 
     private static final String TAG = "OpenUT2004";
 
@@ -100,12 +102,19 @@ public class GameActivity extends Activity {
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
             GameInstaller.prepareConfig(config, width, height);
-            boolean gpu = runtime.gpuAvailable() && !GameData.isGpuFailed(this);
+            boolean retry = getIntent().getBooleanExtra(EXTRA_SOFTWARE_RETRY, false);
+            boolean gpu = !retry && runtime.gpuAvailable() && !GameData.isGpuFailed(this);
             Log.i(TAG, "Rendu " + (gpu ? "GPU (Turnip + Zink)" : "logiciel") + ", " + width + "x" + height);
             java.lang.Process process = runtime.start(width, height, input.port(), gpu);
             message.setText(R.string.game_starting);
             message.postDelayed(() -> message.setVisibility(View.GONE), 4000);
             watch(process, gpu);
+            if (retry) {
+                // Le rendu logiciel tient la ou le GPU echouait : on le retient pour cet appareil
+                message.postDelayed(() -> {
+                    if (process.isAlive()) GameData.setGpuFailed(this, true);
+                }, 15_000);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Lancement", e);
             message.setText(getString(R.string.game_error, e.getMessage()));
@@ -128,10 +137,14 @@ public class GameActivity extends Activity {
             Log.i(TAG, "Moteur termine (code " + code + ")\n" + tail);
             runOnUiThread(() -> {
                 if (early && code != 0 && gpu) {
-                    // Le rendu GPU ne fonctionne pas sur cet appareil : relance en rendu logiciel
-                    Log.w(TAG, "Echec du rendu GPU, passage en rendu logiciel");
-                    GameData.setGpuFailed(this, true);
-                    recreate();
+                    // Nouvel essai en rendu logiciel ; le GPU n'est desactive que si ce rendu
+                    // fonctionne (sinon l'echec ne vient pas du GPU)
+                    Log.w(TAG, "Echec au demarrage en rendu GPU, essai en rendu logiciel");
+                    finishing = true;
+                    runtime.stop();
+                    Intent retry = new Intent(getIntent()).putExtra(EXTRA_SOFTWARE_RETRY, true);
+                    finish();
+                    startActivity(retry);
                 } else if (early && code != 0) {
                     message.setVisibility(View.VISIBLE);
                     message.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);

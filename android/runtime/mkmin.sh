@@ -69,6 +69,10 @@ copy /usr/lib/ld-linux-aarch64.so.1 2>/dev/null || true
 copy /usr/share/X11/xkb /usr/share/X11/locale /usr/share/alsa /usr/share/glvnd /usr/share/drirc.d \
      /usr/lib/xorg/protocol.txt /usr/share/X11/XErrorDB
 copy /etc/passwd /etc/group /etc/nsswitch.conf /etc/ld.so.conf /etc/ld.so.conf.d /etc/asound.conf
+# Conversions de texte (iconv) dont le moteur a besoin au demarrage : Windows-1252, UTF-16
+copy $LIB/gconv/gconv-modules $LIB/gconv/gconv-modules.cache $LIB/gconv/CP1252.so \
+     $LIB/gconv/UTF-16.so $LIB/gconv/UTF-32.so $LIB/gconv/UNICODE.so $LIB/gconv/ISO8859-1.so
+[ -d $LIB/gconv/gconv-modules.d ] && copy $LIB/gconv/gconv-modules.d
 copy /opt/ut
 [ -d /usr/lib/7zip ] && copy /usr/lib/7zip
 [ -d /opt/turnip ] && copy /opt/turnip/share

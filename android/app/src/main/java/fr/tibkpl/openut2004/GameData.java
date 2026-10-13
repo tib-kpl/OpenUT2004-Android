@@ -24,6 +24,7 @@ final class GameData {
     private static final String KEY_DATA_PATH = "data_path";
     private static final String KEY_RENDER_HEIGHT = "render_height";
     private static final String KEY_GPU_FAILED = "gpu_failed";
+    private static final String KEY_GPU_FAILED_VERSION = "gpu_failed_version";
 
     /** Hauteurs de rendu proposees (largeur au format de l'ecran) : 720p fluide, 1080p net. */
     static final int[] RENDER_HEIGHTS = {720, 1080};
@@ -46,13 +47,27 @@ final class GameData {
         prefs(context).edit().putInt(KEY_RENDER_HEIGHT, height).apply();
     }
 
-    /** Vrai si le rendu GPU a echoue sur cet appareil : on reste alors en rendu logiciel. */
+    /**
+     * Vrai si le rendu GPU a echoue sur cet appareil avec cette version de l'appli : on reste
+     * alors en rendu logiciel (reessaye apres chaque mise a jour).
+     */
     static boolean isGpuFailed(Context context) {
-        return prefs(context).getBoolean(KEY_GPU_FAILED, false);
+        SharedPreferences p = prefs(context);
+        return p.getBoolean(KEY_GPU_FAILED, false) && p.getInt(KEY_GPU_FAILED_VERSION, -1) == appVersion(context);
     }
 
     static void setGpuFailed(Context context, boolean failed) {
-        prefs(context).edit().putBoolean(KEY_GPU_FAILED, failed).apply();
+        prefs(context).edit().putBoolean(KEY_GPU_FAILED, failed)
+                .putInt(KEY_GPU_FAILED_VERSION, appVersion(context)).apply();
+    }
+
+    @SuppressWarnings("deprecation")
+    private static int appVersion(Context context) {
+        try {
+            return context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionCode;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private static SharedPreferences prefs(Context context) {
