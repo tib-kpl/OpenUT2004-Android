@@ -151,23 +151,31 @@ static void *input_thread(void *arg)
     return NULL;
 }
 
-__attribute__((constructor)) static void utbridge_init(void)
+/* Demarre le pont dans le moteur : a l'initialisation de SDL3 (seul le moteur l'appelle). */
+static void bridge_start(void)
 {
-    char exe[4096];
+    static int started;
     pthread_t thread;
     const char *dir = getenv("UT_LOG_DIR");
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-    if (n <= 0) return;
-    exe[n] = '\0';
-    if (!strstr(exe, "ut2004-bin")) return; /* uniquement le moteur (pas Xvfb, sh...) */
+    if (started) return;
+    started = 1;
     if (dir) {
         char path[4096];
         snprintf(path, sizeof(path), "%s/utbridge.log", dir);
         logf = fopen(path, "w");
     }
-    logmsg("utbridge: charge dans %s (port %s)\n", exe, getenv("UT_INPUT_PORT") ? getenv("UT_INPUT_PORT") : "?");
+    logmsg("utbridge: demarre (port %s)\n", getenv("UT_INPUT_PORT") ? getenv("UT_INPUT_PORT") : "?");
     XInitThreads();
     if (pthread_create(&thread, NULL, input_thread, NULL) == 0) pthread_detach(thread);
+}
+
+/* SDL3 : bool SDL_Init(SDL_InitFlags) */
+bool SDL_Init(uint32_t flags)
+{
+    static bool (*real_init)(uint32_t);
+    if (!real_init) real_init = (bool (*)(uint32_t))dlsym(RTLD_NEXT, "SDL_Init");
+    bridge_start();
+    return real_init(flags);
 }
 
 /* SDL3 : bool SDL_GL_SwapWindow(SDL_Window *) */
