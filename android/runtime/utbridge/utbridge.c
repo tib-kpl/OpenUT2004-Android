@@ -93,9 +93,18 @@ static void handle(Display *dpy, uint8_t type, uint16_t code, int32_t value)
     case MSG_BUTTON:
         XTestFakeButtonEvent(dpy, code, value ? True : False, CurrentTime);
         break;
-    case MSG_MOTION:
+    case MSG_MOTION: {
+        static int motions;
         XTestFakeRelativeMotionEvent(dpy, (int16_t)(value & 0xffff), (int16_t)((uint32_t)value >> 16), CurrentTime);
+        if (++motions % 200 == 0) { /* diagnostic : position du pointeur X */
+            Window root, child;
+            int rx, ry, wx, wy;
+            unsigned int mask;
+            XQueryPointer(dpy, DefaultRootWindow(dpy), &root, &child, &rx, &ry, &wx, &wy, &mask);
+            logmsg("utbridge: %d mouvements, pointeur X en %d,%d\n", motions, rx, ry);
+        }
         break;
+    }
     case MSG_PAUSE:
         set_paused(value);
         return;
@@ -176,6 +185,31 @@ bool SDL_Init(uint32_t flags)
     if (!real_init) real_init = (bool (*)(uint32_t))dlsym(RTLD_NEXT, "SDL_Init");
     bridge_start();
     return real_init(flags);
+}
+
+/* Diagnostic : lecture de la souris par le moteur (SDL3 : uint32 f(float *x, float *y)) */
+uint32_t SDL_GetRelativeMouseState(float *x, float *y)
+{
+    static uint32_t (*real)(float *, float *);
+    static int calls;
+    uint32_t ret;
+    if (!real) real = (uint32_t (*)(float *, float *))dlsym(RTLD_NEXT, "SDL_GetRelativeMouseState");
+    ret = real(x, y);
+    if (++calls % 600 == 1 || (x && y && (*x != 0 || *y != 0) && calls % 30 == 0)) {
+        logmsg("utbridge: GetRelativeMouseState #%d -> %.1f,%.1f\n", calls, x ? *x : 0.f, y ? *y : 0.f);
+    }
+    return ret;
+}
+
+uint32_t SDL_GetMouseState(float *x, float *y)
+{
+    static uint32_t (*real)(float *, float *);
+    static int calls;
+    uint32_t ret;
+    if (!real) real = (uint32_t (*)(float *, float *))dlsym(RTLD_NEXT, "SDL_GetMouseState");
+    ret = real(x, y);
+    if (++calls % 600 == 1) logmsg("utbridge: GetMouseState #%d -> %.1f,%.1f\n", calls, x ? *x : 0.f, y ? *y : 0.f);
+    return ret;
 }
 
 /* SDL3 : bool SDL_GL_SwapWindow(SDL_Window *) */

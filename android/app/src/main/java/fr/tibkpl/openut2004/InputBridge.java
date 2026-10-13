@@ -20,9 +20,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  * vrai clavier et une vraie souris. Format des messages : voir runtime/utbridge/utbridge.c.
  *
  * Disposition (touches par defaut d'UT2004) : stick gauche = ZQSD/WASD, stick droit = souris,
- * R2 = tir (clic gauche), L2 = tir secondaire (clic droit), A = saut, B = accroupi,
+ * R2 = tir (clic gauche), L2 = tir secondaire (clic droit), A = saut, B = retour (Echap),
  * X = utiliser, Y = translocateur, L1/R1 = arme precedente/suivante, Start = menu,
- * Select = scores, croix = fleches (menus).
+ * Select = scores, L3 = accroupi, R3 = meilleure arme, croix = fleches.
  */
 final class InputBridge {
 
@@ -38,7 +38,7 @@ final class InputBridge {
             XK_DELETE = 0xffff, XK_PAGE_UP = 0xff55, XK_PAGE_DOWN = 0xff56, XK_HOME = 0xff50, XK_END = 0xff57;
 
     // Boutons souris X11
-    private static final int MOUSE_LEFT = 1, MOUSE_MIDDLE = 2, MOUSE_RIGHT = 3, WHEEL_UP = 4, WHEEL_DOWN = 5;
+    private static final int MOUSE_LEFT = 1, MOUSE_RIGHT = 3, WHEEL_UP = 4, WHEEL_DOWN = 5;
 
     /** Boutons de manette -> touche (keysym) ou bouton souris (valeur negative). */
     private static final SparseIntArray PAD = new SparseIntArray();
@@ -47,13 +47,13 @@ final class InputBridge {
 
     static {
         PAD.put(KeyEvent.KEYCODE_BUTTON_A, ' ');          // saut
-        PAD.put(KeyEvent.KEYCODE_BUTTON_B, 'c');          // accroupi
+        PAD.put(KeyEvent.KEYCODE_BUTTON_B, XK_ESCAPE);    // retour (menus) / menu (jeu)
         PAD.put(KeyEvent.KEYCODE_BUTTON_X, 'e');          // utiliser
         PAD.put(KeyEvent.KEYCODE_BUTTON_Y, 'q');          // translocateur
         PAD.put(KeyEvent.KEYCODE_BUTTON_START, XK_ESCAPE); // menu
         PAD.put(KeyEvent.KEYCODE_BUTTON_SELECT, XK_F1);   // scores
-        PAD.put(KeyEvent.KEYCODE_BUTTON_THUMBL, 'g');     // meilleure arme
-        PAD.put(KeyEvent.KEYCODE_BUTTON_THUMBR, -MOUSE_MIDDLE);
+        PAD.put(KeyEvent.KEYCODE_BUTTON_THUMBL, 'c');     // accroupi
+        PAD.put(KeyEvent.KEYCODE_BUTTON_THUMBR, 'g');     // meilleure arme
         PAD.put(KeyEvent.KEYCODE_BUTTON_R2, -MOUSE_LEFT);  // tir
         PAD.put(KeyEvent.KEYCODE_BUTTON_L2, -MOUSE_RIGHT); // tir secondaire
         PAD.put(KeyEvent.KEYCODE_DPAD_UP, XK_UP);
