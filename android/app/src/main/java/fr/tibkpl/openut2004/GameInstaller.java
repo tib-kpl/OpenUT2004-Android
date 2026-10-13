@@ -79,6 +79,10 @@ final class GameInstaller {
 
     private GameInstaller() {}
 
+    static File patchDir(Context context) {
+        return new File(context.getFilesDir(), "patch");
+    }
+
     static File rootfsDir(Context context) {
         return new File(context.getFilesDir(), "rootfs");
     }
@@ -334,7 +338,7 @@ final class GameInstaller {
      * ~/.ut2004/System/UT2004.ini : cree depuis Default.ini du moteur arm64 au premier
      * lancement, puis rendu OpenGL et resolution plein ecran au format de l'ecran.
      */
-    static void prepareConfig(LaunchConfig config, int width, int height) throws IOException {
+    static void prepareConfig(LaunchConfig config, int width, int height, String language) throws IOException {
         File ini = new File(config.homeDir, ".ut2004/System/UT2004.ini");
         List<String> lines;
         if (ini.isFile()) {
@@ -344,6 +348,7 @@ final class GameInstaller {
             lines = new ArrayList<>(Files.readAllLines(defaults.toPath(), StandardCharsets.ISO_8859_1));
         }
         Ini.set(lines, "Engine.Engine", "RenderDevice", "OpenGLDrv.OpenGLRenderDevice");
+        Ini.set(lines, "Engine.Engine", "Language", language);
         Ini.set(lines, "Engine.Engine", "AudioDevice", "ALAudio.ALAudioSubsystem");
         // Toutes les tailles a la resolution choisie : l'image remplit l'ecran X virtuel meme si
         // le moteur demarre en mode fenetre (pas de gestionnaire de fenetres, fenetre en 0,0)

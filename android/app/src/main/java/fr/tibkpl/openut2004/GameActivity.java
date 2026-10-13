@@ -58,6 +58,7 @@ public class GameActivity extends Activity {
         root.addView(message, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        addSettingsButton();
         hideSystemBars();
 
         String path = getIntent().getStringExtra(EXTRA_GAME_DIR);
@@ -101,7 +102,8 @@ public class GameActivity extends Activity {
             root.addView(view, 0, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-            GameInstaller.prepareConfig(config, width, height);
+            String language = GameData.getLanguage(this, GameData.detectLanguages(config.gameRoot, config.patchDir));
+            GameInstaller.prepareConfig(config, width, height, language);
             boolean retry = getIntent().getBooleanExtra(EXTRA_SOFTWARE_RETRY, false);
             boolean gpu = !retry && runtime.gpuAvailable() && !GameData.isGpuFailed(this);
             Log.i(TAG, "Rendu " + (gpu ? "GPU (Turnip + Zink)" : "logiciel") + ", " + width + "x" + height);
@@ -157,6 +159,28 @@ public class GameActivity extends Activity {
         }, "ut2004-watch");
         watcher.setDaemon(true);
         watcher.start();
+    }
+
+    /** Petit rouage en surimpression : retour aux reglages (langue, resolution, dossier). */
+    private void addSettingsButton() {
+        android.widget.ImageButton gear = new android.widget.ImageButton(this);
+        gear.setImageResource(R.drawable.ic_settings);
+        gear.setBackgroundColor(0x00000000);
+        gear.setAlpha(0.45f);
+        gear.setFocusable(false);
+        gear.setContentDescription(getString(R.string.settings));
+        int size = Math.round(40 * getResources().getDisplayMetrics().density);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+        lp.setMargins(0, size / 4, size / 4, 0);
+        gear.setOnClickListener(v -> openSettings());
+        root.addView(gear, lp);
+    }
+
+    private void openSettings() {
+        finishing = true;
+        if (runtime != null) runtime.stop();
+        startActivity(new Intent(this, LauncherActivity.class).setAction(LauncherActivity.ACTION_SETTINGS));
+        finish();
     }
 
     @Override

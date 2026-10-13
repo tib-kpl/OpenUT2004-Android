@@ -24,6 +24,23 @@ final class GameData {
     private static final String KEY_DATA_PATH = "data_path";
     private static final String KEY_RENDER_HEIGHT = "render_height";
     private static final String KEY_GPU_FAILED = "gpu_failed";
+    private static final String KEY_LANGUAGE = "language";
+
+    /**
+     * Langues d'UT2004 (extension des fichiers de textes) et nom affiche ; codes pris en charge
+     * par l'installeur OldUnreal.
+     */
+    static final String[][] LANGUAGES = {
+            {"int", "English"}, {"frt", "Français"}, {"det", "Deutsch"}, {"est", "Español"},
+            {"itt", "Italiano"}, {"ptt", "Português"}, {"nlt", "Nederlands"}, {"plt", "Polski"},
+            {"het", "Magyar"}, {"rut", "Русский"}, {"elt", "Ελληνικά"}, {"kot", "한국어"},
+            {"ctt", "繁體中文"}, {"smt", "简体中文"}, {"tmt", "ไทย"},
+    };
+    /** Langue Android -> code UT2004. */
+    private static final String[][] DEVICE_LANGUAGES = {
+            {"fr", "frt"}, {"de", "det"}, {"es", "est"}, {"it", "itt"}, {"pt", "ptt"}, {"nl", "nlt"},
+            {"pl", "plt"}, {"hu", "het"}, {"ru", "rut"}, {"el", "elt"}, {"ko", "kot"}, {"th", "tmt"},
+    };
     private static final String KEY_GPU_FAILED_VERSION = "gpu_failed_version";
 
     /** Hauteurs de rendu proposees (largeur au format de l'ecran) : 720p fluide, 1080p net. */
@@ -68,6 +85,59 @@ final class GameData {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    /**
+     * Langues disponibles : extensions des fichiers de textes presents dans System/ (donnees du
+     * jeu) ou SystemLocalized/ (patch OldUnreal). L'anglais (int) est toujours propose en premier.
+     */
+    static List<String> detectLanguages(File gameDir, File patchDir) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        found.add("int");
+        collectExtensions(resolve(gameDir, "System"), found);
+        File localized = new File(patchDir, "SystemLocalized");
+        String[] dirs = localized.list();
+        if (dirs != null) {
+            for (String d : dirs) {
+                if (new File(localized, d).isDirectory()) found.add(d.toLowerCase(Locale.ROOT));
+            }
+        }
+        collectExtensions(localized, found);
+        List<String> result = new ArrayList<>();
+        for (String[] lang : LANGUAGES) if (found.contains(lang[0])) result.add(lang[0]);
+        return result;
+    }
+
+    private static void collectExtensions(File dir, java.util.Set<String> found) {
+        String[] names = dir == null ? null : dir.list();
+        if (names == null) return;
+        for (String name : names) {
+            int dot = name.lastIndexOf('.');
+            if (dot > 0) {
+                String ext = name.substring(dot + 1).toLowerCase(Locale.ROOT);
+                for (String[] lang : LANGUAGES) if (lang[0].equals(ext)) found.add(ext);
+            }
+        }
+    }
+
+    /** Langue choisie, ou celle de l'appareil si elle est disponible, sinon l'anglais. */
+    static String getLanguage(Context context, List<String> available) {
+        String saved = prefs(context).getString(KEY_LANGUAGE, null);
+        if (saved != null && available.contains(saved)) return saved;
+        String device = Locale.getDefault().getLanguage();
+        for (String[] map : DEVICE_LANGUAGES) {
+            if (map[0].equals(device) && available.contains(map[1])) return map[1];
+        }
+        return "int";
+    }
+
+    static void saveLanguage(Context context, String code) {
+        prefs(context).edit().putString(KEY_LANGUAGE, code).apply();
+    }
+
+    static String languageName(String code) {
+        for (String[] lang : LANGUAGES) if (lang[0].equals(code)) return lang[1];
+        return code;
     }
 
     private static SharedPreferences prefs(Context context) {

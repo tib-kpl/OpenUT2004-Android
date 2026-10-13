@@ -27,6 +27,8 @@ import java.io.File;
 public class LauncherActivity extends Activity {
 
     static final String ACTION_CHANGE_FOLDER = "fr.tibkpl.openut2004.CHANGE_FOLDER";
+    /** Ouvert depuis le rouage du jeu : reglages affiches, pas de lancement automatique. */
+    static final String ACTION_SETTINGS = "fr.tibkpl.openut2004.SETTINGS";
 
     private static final int REQ_PICK_GAME = 1;
     private static final int REQ_PICK_DOWNLOAD = 2;
@@ -38,6 +40,7 @@ public class LauncherActivity extends Activity {
     private Button downloadButton;
     private Button pickButton;
     private Button resolutionButton;
+    private Button languageButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     /** Vrai quand on vient du raccourci "Changer le dossier" : pas de lancement auto. */
@@ -62,11 +65,13 @@ public class LauncherActivity extends Activity {
         downloadButton = findViewById(R.id.download);
         pickButton = findViewById(R.id.pick);
         resolutionButton = findViewById(R.id.resolution);
+        languageButton = findViewById(R.id.language);
         downloadButton.setOnClickListener(v -> confirmDownload());
         pickButton.setOnClickListener(v -> openPicker(REQ_PICK_GAME));
         resolutionButton.setOnClickListener(v -> cycleResolution());
         updateResolutionButton();
-        forcePick = ACTION_CHANGE_FOLDER.equals(getIntent().getAction());
+        forcePick = ACTION_CHANGE_FOLDER.equals(getIntent().getAction())
+                || ACTION_SETTINGS.equals(getIntent().getAction());
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_PERMISSION);
@@ -138,6 +143,7 @@ public class LauncherActivity extends Activity {
             status.setText(R.string.status_no_game);
         }
         setButtons(gameDir != null, true, true);
+        updateLanguageButton(gameDir);
         if (gameDir != null) {
             playButton.setOnClickListener(v -> launchGame(gameDir));
             playButton.requestFocus();
@@ -223,6 +229,23 @@ public class LauncherActivity extends Activity {
         } catch (IllegalArgumentException e) {
             return -1;
         }
+    }
+
+    /** Langues detectees dans les fichiers du jeu (et du patch) ; bouton masque sans jeu. */
+    private void updateLanguageButton(File gameDir) {
+        if (gameDir == null) {
+            languageButton.setVisibility(View.GONE);
+            return;
+        }
+        java.util.List<String> languages = GameData.detectLanguages(gameDir, GameInstaller.patchDir(this));
+        String current = GameData.getLanguage(this, languages);
+        languageButton.setVisibility(View.VISIBLE);
+        languageButton.setText(getString(R.string.btn_language, GameData.languageName(current)));
+        languageButton.setOnClickListener(v -> {
+            int i = languages.indexOf(current);
+            GameData.saveLanguage(this, languages.get((i + 1) % languages.size()));
+            updateLanguageButton(gameDir);
+        });
     }
 
     private void cycleResolution() {

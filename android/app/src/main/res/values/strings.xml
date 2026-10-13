@@ -8,6 +8,8 @@
     <string name="btn_download">Télécharger le jeu (≈ 3 Go)</string>
     <string name="btn_pick">J\'ai déjà le jeu : choisir son dossier</string>
     <string name="btn_grant">Autoriser l\'accès aux fichiers</string>
+    <string name="btn_language">Langue du jeu : %1$s</string>
+    <string name="settings">Réglages</string>
     <string name="btn_resolution_720">Résolution : 720p (fluide)</string>
     <string name="btn_resolution_1080">Résolution : 1080p (net)</string>
 
