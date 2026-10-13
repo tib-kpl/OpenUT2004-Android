@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icone originale : viseur stylise (aucun element graphique du jeu) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- anneau -->
+    <path android:strokeColor="#FFFF7A1A" android:strokeWidth="4" android:fillColor="#00000000"
+        android:pathData="M54,32 a22,22 0 1,0 0.01,0 Z"/>
+    <!-- graduations -->
+    <path android:fillColor="#FFFF7A1A" android:pathData="M52,22 h4 v12 h-4 Z"/>
+    <path android:fillColor="#FFFF7A1A" android:pathData="M52,74 h4 v12 h-4 Z"/>
+    <path android:fillColor="#FFFF7A1A" android:pathData="M22,52 h12 v4 h-12 Z"/>
+    <path android:fillColor="#FFFF7A1A" android:pathData="M74,52 h12 v4 h-12 Z"/>
+    <!-- point central -->
+    <path android:fillColor="#FFFFD27A" android:pathData="M54,50 a4,4 0 1,0 0.01,0 Z"/>
+</vector>

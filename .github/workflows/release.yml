@@ -1,0 +1,143 @@
+name: Release APK
+
+# Chaque push sur main publie une release GitHub avec l'APK (version 0.1.<numero du build>).
+# Lancement manuel possible (Actions > Release APK > Run workflow) ; depuis une autre branche,
+# rien n'est publie (APK disponible en artefact).
+# Mesa et le runtime Linux sont construits nativement sur des runners arm64 (gratuits pour
+# les depots publics), l'APK sur un runner x86_64.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  mesa:
+    name: Mesa Turnip arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      # Compilation mise en cache : refaite seulement si build-mesa.sh change
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: android/runtime/out/turnip.tgz
+          key: turnip-arm64-${{ hashFiles('android/runtime/build-mesa.sh') }}
+
+      - name: Compilation de Mesa
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: docker run --rm -v "$PWD:/src" debian:trixie sh /src/android/runtime/build-mesa.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: turnip
+          path: android/runtime/out/turnip.tgz
+          retention-days: 1
+
+  runtime:
+    name: Runtime Linux arm64
+    needs: mesa
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: turnip
+          path: android/runtime/out
+
+      - name: Construction du rootfs (Debian trixie arm64)
+        run: docker run --rm -v "$PWD:/src" debian:trixie sh /src/android/runtime/build-runtime.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: rootfs
+          path: |
+            android/runtime/out/rootfs.tgz
+            android/runtime/out/packages.txt
+          retention-days: 1
+
+  apk:
+    name: APK
+    needs: runtime
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: rootfs
+          path: android/runtime/out
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # SDK Android preinstalle sur les runners GitHub ($ANDROID_HOME)
+      - name: SDK Android
+        run: |
+          SDKMANAGER=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: proot (paquets Termux)
+        run: python3 runtime/prepare-proot.py
+
+      - name: Cle de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OPENUT2004_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "OPENUT2004_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Secret OPENUT2004_KEYSTORE_BASE64 absent : APK signe avec une cle de debug"
+          fi
+
+      - name: Version
+        run: |
+          NAME="0.1.${GITHUB_RUN_NUMBER}"
+          echo "OPENUT2004_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "OPENUT2004_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v$NAME" >> "$GITHUB_ENV"
+          echo "APK_NAME=OpenUT2004-$NAME.apk" >> "$GITHUB_ENV"
+
+      - name: Compilation
+        env:
+          OPENUT2004_KEYSTORE_PASSWORD: ${{ secrets.OPENUT2004_KEYSTORE_PASSWORD }}
+          OPENUT2004_KEY_ALIAS: ${{ secrets.OPENUT2004_KEY_ALIAS }}
+          OPENUT2004_KEY_PASSWORD: ${{ secrets.OPENUT2004_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          mv app/build/outputs/apk/release/app-release.apk "$APK_NAME"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: apk
+          path: android/${{ env.APK_NAME }}
+          retention-days: 7
+
+      # Release uniquement depuis main (une autre branche lancee a la main ne publie rien)
+      - name: Release GitHub
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: OpenUT2004 ${{ env.OPENUT2004_VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            android/${{ env.APK_NAME }}
+            android/runtime/out/packages.txt
+          generate_release_notes: true

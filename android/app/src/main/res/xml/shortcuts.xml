@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Appui long sur l'icone : changer le dossier du jeu -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="change_folder"
+        android:shortcutShortLabel="@string/shortcut_change_folder">
+        <intent
+            android:action="fr.tibkpl.openut2004.CHANGE_FOLDER"
+            android:targetClass="fr.tibkpl.openut2004.LauncherActivity"
+            android:targetPackage="fr.tibkpl.openut2004" />
+    </shortcut>
+</shortcuts>

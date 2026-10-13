@@ -1,0 +1,133 @@
+# OpenUT2004-Android
+
+**Unofficial** Android launcher for **Unreal Tournament 2004** on ARM64 Android handhelds and
+phones, running the native Linux ARM64 engine of the community
+[OldUnreal UT2004 patch](https://github.com/OldUnreal/UT2004Patches).
+
+> [!IMPORTANT]
+> OpenUT2004 contains **no game files and no game engine**. On first launch it downloads the
+> OldUnreal patch (engine) from its official GitHub releases. For the game data, you can
+> either point it to an existing installation (PC, DVD, GOG…), or let it download the game:
+> Epic Games allows Unreal Tournament 2004 to be distributed for free, and OpenUT2004 fetches
+> the DVD image from the same sources as OldUnreal's official installer (OldUnreal servers,
+> with the Internet Archive as fallback).
+
+## Features
+
+- **Download the game** to the folder of your choice (internal storage or SD card), or
+  **use an existing installation**. The location is remembered.
+- Native ARM64 engine (OldUnreal patch 3374) running in a small embedded Linux environment:
+  no emulation.
+- GPU rendering on Adreno (Snapdragon) devices through Mesa Turnip + Zink, with automatic
+  fallback to software rendering elsewhere. Resolution: 720p (smooth) or 1080p (sharp), in
+  the screen's aspect ratio (16:9…).
+- Built-in or Bluetooth gamepad (translated to keyboard and mouse, so it works in menus
+  too), physical keyboard.
+- Sound. The game pauses and goes silent when the app is in the background or the screen is
+  locked.
+
+Tested on the **AYN Odin 2 Portal** (Snapdragon 8 Gen 2, Android 13).
+
+## Installation
+
+1. Download `OpenUT2004-x.y.z.apk` from the [Releases](../../releases) page and install it.
+2. Start **OpenUT2004** and grant **all files access**.
+3. Either:
+   - **Download the game (≈ 3 GB)**: pick a destination folder; an `UT2004` folder is
+     created there. About 9 GB of free space are needed during installation (≈ 6 GB
+     afterwards). The download continues with the screen off and resumes if interrupted;
+   - or **I already have the game**: pick the folder of an existing UT2004 installation
+     (the one containing `System`, `Maps`, `Textures`…).
+4. On first launch, OpenUT2004 installs its Linux runtime and downloads the OldUnreal patch.
+   An Internet connection is required for that first launch only.
+
+To change the game folder later: **long-press the icon → "Changer le dossier du jeu"**.
+
+### Gamepad controls
+
+The gamepad is translated to UT2004's default keyboard and mouse controls.
+
+| Button | Action |
+|---|---|
+| Left stick | Move (W/A/S/D) |
+| Right stick | Aim / move the menu cursor (mouse) |
+| R2 | Fire (left click, also clicks in menus) |
+| L2 | Alt fire (right click) |
+| A | Jump |
+| B | Crouch |
+| X | Use |
+| Y | Translocator |
+| L1 / R1 | Previous / next weapon |
+| Start | Menu |
+| Select | Scores |
+| D-pad | Arrow keys (menus) |
+| L3 | Best weapon |
+
+## How it works
+
+```
+Android app (Java)
+ ├─ proot ─► minimal Debian arm64 ─► Xvfb (virtual X screen) ─► UT2004 engine (OldUnreal, arm64)
+ │                                     ├─ OpenGL: Mesa Zink -> Vulkan Turnip -> Adreno GPU (KGSL)
+ │                                     └─ libutbridge.so (LD_PRELOAD): keyboard/mouse (XTest), pause
+ ├─ shows the Xvfb framebuffer (mmap) with OpenGL ES, scaled to the screen
+ ├─ sends gamepad/keyboard input to libutbridge (local socket)
+ └─ plays the sound: OpenAL -> ALSA -> FIFO -> AudioTrack
+```
+
+The game is installed like OldUnreal's official Linux installer does
+([FullGameInstallers](https://github.com/OldUnreal/FullGameInstallers)): the DVD image is
+extracted with 7-Zip, its InstallShield cabinets with unshield, inside the embedded Linux
+environment. The engine sees the game data through symbolic links, with the patch files on
+top, so an existing installation is never modified.
+
+## Repository layout
+
+| Path | Content |
+|---|---|
+| `android/app/` | Android app |
+| `android/runtime/` | Linux runtime build: rootfs, Mesa Turnip, bridge library, install script, proot |
+| `.github/workflows/release.yml` | APK build and release |
+
+## Building
+
+### With GitHub Actions
+
+Every push to `main` builds the APK and publishes it as a new release (version
+`0.1.<build number>`). Mesa and the Linux runtime are built natively on GitHub's ARM64
+runners.
+
+**Signing**: the APK is signed with the key stored in the repository secrets
+`OPENUT2004_KEYSTORE_BASE64`, `OPENUT2004_KEYSTORE_PASSWORD`, `OPENUT2004_KEY_ALIAS` and
+`OPENUT2004_KEY_PASSWORD` (debug key if they are missing). Always sign with the same key so
+that updates install over the previous version.
+
+### Locally
+
+Requirements: JDK 17+, Android SDK (platform 36), Python 3, Docker (ARM64 host or emulation).
+
+```sh
+# 1. Mesa Turnip + Zink -> android/runtime/out/turnip.tgz
+docker run --rm -v "$PWD:/src" debian:trixie sh /src/android/runtime/build-mesa.sh
+
+# 2. ARM64 Linux runtime -> android/runtime/out/rootfs.tgz
+docker run --rm --platform linux/arm64 -v "$PWD:/src" debian:trixie sh /src/android/runtime/build-runtime.sh
+
+# 3. proot (Termux packages) -> android/app/src/main/jniLibs/arm64-v8a/
+python3 android/runtime/prepare-proot.py
+
+# 4. APK
+cd android && ./gradlew assembleRelease
+```
+
+## Credits and licenses
+
+- **Unreal Tournament 2004** © Epic Games. The game's trademarks and content belong to Epic
+  Games. This project is **neither affiliated with nor endorsed** by Epic Games.
+- **OldUnreal** (https://www.oldunreal.com): UT2004 patch 3374 and official installers. Not
+  redistributed by this project: the app downloads them from their official sources.
+- **proot** (GPL-2.0) and **libtalloc** (LGPL-3.0): [Termux](https://termux.dev) packages.
+- **Linux runtime**: [Debian](https://www.debian.org) 13 packages (glibc, Mesa, X.Org Xvfb,
+  7-Zip, unshield…) and Mesa built from source, each under its own license.
+- License details and source code access: [THIRD_PARTY.md](THIRD_PARTY.md).
+- OpenUT2004's icon and artwork are original creations of this project.

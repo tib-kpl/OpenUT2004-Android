@@ -1,0 +1,29 @@
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+
+# Genere : runtime Linux (build-runtime.sh), Mesa (build-mesa.sh), proot (prepare-proot.py)
+android/runtime/out/
+android/app/src/main/jniLibs/
+
+# Cle de signature (secret GitHub)
+*.jks
+*.keystore
+
+# Jamais de fichiers du jeu dans le depot
+*.iso
+*.ISO
+*.cab
+*.ut2
+*.utx
+*.uax
+*.umx
+*.usx
+*.ukx
+
+# Divers
+.vscode/
+*.log
