@@ -67,6 +67,7 @@ final class GameRuntime {
         env.add("UT_RENDERER=" + (gpu ? "gpu" : "software"));
         env.add("UT_LOG_DIR=/logs");
         env.add("SDL_JOYSTICK_HIDAPI=0");
+        LanNetwork.prepare(context, config.rootfsDir);
         ProcessBuilder pb = proot(context, config.rootfsDir, binds, env, "/game", "/opt/ut/run.sh");
         pb.redirectErrorStream(true);
         pb.redirectOutput(logFile());

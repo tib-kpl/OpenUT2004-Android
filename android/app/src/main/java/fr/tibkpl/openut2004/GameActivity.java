@@ -42,6 +42,7 @@ public class GameActivity extends Activity {
     private Button inputMode;
     private TextView fpsCounter;
     private AudioBridge audio;
+    private LanNetwork lanNetwork;
     private volatile boolean finishing;
     private boolean resumed;
     private java.util.List<String> availableLanguages;
@@ -98,6 +99,7 @@ public class GameActivity extends Activity {
         try {
             audio = new AudioBridge(runtime.audioFifo());
             audio.start();
+            lanNetwork = new LanNetwork(this);
             InputBridge.debug = false;
             input = new InputBridge(menu -> runOnUiThread(() -> {
                 if (input == null || finishing) return;
@@ -378,6 +380,7 @@ public class GameActivity extends Activity {
         finishing = true;
         if (runtime != null) runtime.stop();
         if (audio != null) audio.stop();
+        if (lanNetwork != null) lanNetwork.close();
         if (controllerMonitor != null) controllerMonitor.close();
         if (input != null) input.close();
         super.onDestroy();

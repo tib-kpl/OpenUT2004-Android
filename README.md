@@ -83,6 +83,20 @@ In Game mode:
 | L3 | Crouch |
 | R3 | Best weapon |
 
+### Local multiplayer (LAN)
+
+Connect both devices to the same Wi-Fi network. On the host, create a multiplayer game
+and start the listen server. On the other device, open the LAN server list and select
+the discovered game; no IP address needs to be entered. In UT2004, enable **Serveur LAN**
+in the server rules and use **Ecoute** to host while playing.
+
+The launcher enables Wi-Fi multicast reception while the engine runs and prepares Linux
+hostname/DNS resolution from the Android network. Discovery and joining were tested between
+an Odin 2 Portal and an AYN Thor: UT99 (DM-Agony), Unreal Gold (DmTerra), and UT2004
+(DM-1on1-Albatross). A guest Wi-Fi network that isolates clients prevents LAN connections.
+Internet server discovery and hosting depend on the game's master servers and router setup;
+these two-console tests validate LAN play.
+
 ## How it works
 
 ```
