@@ -38,6 +38,7 @@ public class GameActivity extends Activity {
     private TextView message;
     private GameRuntime runtime;
     private InputBridge input;
+    private ControllerMonitor controllerMonitor;
     private Button inputMode;
     private TextView fpsCounter;
     private AudioBridge audio;
@@ -103,6 +104,8 @@ public class GameActivity extends Activity {
                 input.setMenuMode(menu);
                 updateInputModeButton();
             }));
+
+            controllerMonitor = new ControllerMonitor(this, input::resetController);
 
             Point screen = screenSize();
             // Hauteur de rendu choisie (largeur au format de l'ecran, donc 16:9 sur un ecran
@@ -375,6 +378,7 @@ public class GameActivity extends Activity {
         finishing = true;
         if (runtime != null) runtime.stop();
         if (audio != null) audio.stop();
+        if (controllerMonitor != null) controllerMonitor.close();
         if (input != null) input.close();
         super.onDestroy();
     }

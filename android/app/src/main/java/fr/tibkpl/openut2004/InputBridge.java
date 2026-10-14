@@ -106,7 +106,6 @@ final class InputBridge {
     private static final float AIM_SPEED = 22f;
     private static final float STICK_DEADZONE = 0.15f;
     private static final float MOVE_THRESHOLD = 0.4f;
-    private static final float TRIGGER_PRESS = 0.5f, TRIGGER_RELEASE = 0.25f;
 
     private final ServerSocket server;
     interface ModeListener { void onModeChanged(boolean menu); }
@@ -128,7 +127,7 @@ final class InputBridge {
     private final int[] heldMoveKeys = new int[4];
     private final boolean[] moveKeys = new boolean[4]; // w, s, a, d
     private final boolean[] triggers = new boolean[2]; // L2, R2 (axes analogiques)
-    private boolean triggerKeys; // la manette envoie des touches L2/R2
+    private final TriggerState triggerState = new TriggerState();
     private int hatX, hatY;
 
     static boolean debug;
@@ -208,9 +207,19 @@ final class InputBridge {
             if (moveKeys[i]) send(MSG_KEY, heldMoveKeys[i], 0);
             moveKeys[i] = false;
         }
-        for (int i = 0; i < heldPadKeys.size(); i++) send(MSG_KEY, heldPadKeys.valueAt(i), 0);
+        for (int i = 0; i < heldPadKeys.size(); i++) {
+            int mapped = heldPadKeys.valueAt(i);
+            if (mapped > 0) send(MSG_KEY, mapped, 0);
+            else if (mapped == -MOUSE_LEFT || mapped == -MOUSE_RIGHT) send(MSG_BUTTON, -mapped, 0);
+        }
         heldPadKeys.clear();
         menuMode = enabled;
+    }
+
+    void resetController() {
+        setMenuMode(menuMode);
+        triggerState.clear();
+        for (int trigger = 0; trigger < 2; trigger++) setTrigger(trigger, false);
     }
 
     void close() {
@@ -228,9 +237,7 @@ final class InputBridge {
     /** Fige (true) ou relance (false) la boucle du jeu. */
     void setPaused(boolean paused) {
         if (paused) {
-            setMenuMode(menuMode);
-            setTrigger(0, false);
-            setTrigger(1, false);
+            resetController();
         }
         send(MSG_PAUSE, 0, paused ? 1 : 0);
     }
@@ -245,8 +252,8 @@ final class InputBridge {
 
         if (isGamepad(event.getSource()) || ControllerInput.isController(event.getDevice()) || ControllerInput.isButton(keyCode)) {
             if (keyCode == KeyEvent.KEYCODE_BUTTON_L2 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
-                triggerKeys = true;
-                setTrigger(keyCode == KeyEvent.KEYCODE_BUTTON_R2 ? 1 : 0, down);
+                int trigger = keyCode == KeyEvent.KEYCODE_BUTTON_R2 ? 1 : 0;
+                setTrigger(trigger, triggerState.button(trigger, down));
                 return true;
             }
             int mapped = PAD.get(keyCode, 0);
@@ -296,11 +303,9 @@ final class InputBridge {
         aimX = deadzone(event, ControllerInput.rightAxis(event, true));
         aimY = deadzone(event, ControllerInput.rightAxis(event, false));
 
-        // Gachettes analogiques (si la manette n'envoie pas de touches L2/R2)
-        if (!triggerKeys) {
-            analogTrigger(0, Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE)));
-            analogTrigger(1, Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS)));
-        }
+        // Gachettes : fusion des axes et des touches, sans actions en double.
+        analogTrigger(0, Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE)));
+        analogTrigger(1, Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS)));
 
         // Croix "hat" -> fleches
         int newHatX = Math.round(event.getAxisValue(MotionEvent.AXIS_HAT_X));
@@ -320,7 +325,10 @@ final class InputBridge {
 
     private static float deadzone(MotionEvent event, int axis) {
         float v = event.getAxisValue(axis);
-        return Math.abs(v) < STICK_DEADZONE ? 0f : v;
+        InputDevice device = event.getDevice();
+        InputDevice.MotionRange range = device == null ? null : device.getMotionRange(axis, event.getSource());
+        float flat = range == null ? STICK_DEADZONE : Math.max(STICK_DEADZONE, range.getFlat());
+        return Math.abs(v) < flat ? 0f : Math.max(-1f, Math.min(1f, v));
     }
 
     private int hatKey(int direction, boolean horizontal) {
@@ -336,8 +344,7 @@ final class InputBridge {
     }
 
     private void analogTrigger(int trigger, float value) {
-        if (!triggers[trigger] && value > TRIGGER_PRESS) setTrigger(trigger, true);
-        else if (triggers[trigger] && value < TRIGGER_RELEASE) setTrigger(trigger, false);
+        setTrigger(trigger, triggerState.axis(trigger, value));
     }
 
     /** trigger 0 = L2 (clic droit), 1 = R2 (clic gauche). */

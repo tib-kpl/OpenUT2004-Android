@@ -66,6 +66,7 @@ final class GameRuntime {
         env.add("UT_INPUT_PORT=" + inputPort);
         env.add("UT_RENDERER=" + (gpu ? "gpu" : "software"));
         env.add("UT_LOG_DIR=/logs");
+        env.add("SDL_JOYSTICK_HIDAPI=0");
         ProcessBuilder pb = proot(context, config.rootfsDir, binds, env, "/game", "/opt/ut/run.sh");
         pb.redirectErrorStream(true);
         pb.redirectOutput(logFile());
@@ -95,6 +96,13 @@ final class GameRuntime {
             cmd.add("-b");
             cmd.add(b);
         }
+        // Android forwards controller input; do not also open physical evdev devices.
+        File inputDevices = new File(context.getFilesDir(), "linux-input");
+        if (!inputDevices.isDirectory() && !inputDevices.mkdirs()) {
+            throw new IOException("Creation du dossier des entrees impossible");
+        }
+        cmd.add("-b");
+        cmd.add(inputDevices.getAbsolutePath() + ":/dev/input");
         for (String b : binds) {
             cmd.add("-b");
             cmd.add(b);

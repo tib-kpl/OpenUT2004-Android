@@ -41,8 +41,13 @@ final class ControllerInput {
             if (layout == 1) return primary;
             if (layout == 2) return alternate;
         }
-        if (device != null && device.getMotionRange(primary) == null
-                && device.getMotionRange(alternate) != null) return alternate;
+        if (device != null) {
+            InputDevice.MotionRange main = device.getMotionRange(primary, event.getSource());
+            InputDevice.MotionRange other = device.getMotionRange(alternate, event.getSource());
+            if (other != null && (main == null || (main.getMin() >= 0 && other.getMin() < 0))) {
+                return alternate;
+            }
+        }
         return primary;
     }
 }

@@ -51,6 +51,18 @@ final class ControllerSettings {
         help.setText("Choisissez un bouton à configurer, puis appuyez sur la touche correspondante de cette manette. Les réglages sont conservés pour ce périphérique. La croix analogique (hat) est reconnue automatiquement.");
         rows.addView(help);
         String[] labels = {"A", "B", "X", "Y", "L1", "R1", "L2", "R2", "Select", "Start", "L3", "R3", "Croix haut", "Croix bas", "Croix gauche", "Croix droite"};
+        if (device.getVendorId() == 0x054c) {
+            labels[0] = "Croix (A)"; labels[1] = "Cercle (B)";
+            labels[2] = "Carre (X)"; labels[3] = "Triangle (Y)";
+            labels[8] = "Share / Create"; labels[9] = "Options";
+        } else if (device.getVendorId() == 0x045e) {
+            labels[4] = "LB"; labels[5] = "RB"; labels[6] = "LT"; labels[7] = "RT";
+            labels[8] = "View"; labels[9] = "Menu";
+        } else if (device.getVendorId() == 0x057e) {
+            labels[0] = "B (position A)"; labels[1] = "A (position B)";
+            labels[2] = "Y (position X)"; labels[3] = "X (position Y)";
+            labels[6] = "ZL"; labels[7] = "ZR";
+        }
         int[] logical = {KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X,
                 KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
                 KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_SELECT,

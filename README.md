@@ -159,3 +159,17 @@ The launcher offers both **Retour au jeu** (resume the existing session) and **R
 French voice audio requires the localized `Sounds/*.frt_uax` files in addition to French UI text. The English OldUnreal installation media does not include those voices. They can be obtained from the [DXM French patch](https://www.dxm.be/navigator.php5?content=216&lang=fr) and placed alongside the original `.uax` files. The launcher sets the engine language to `frt` when French is selected. Voice data is not bundled in the APK or this repository.
 
 Launcher artwork and the colored app icon are original generated fan art inspired by the game.
+
+### External controllers
+
+Xbox, PlayStation (DualShock / DualSense), Switch-style and generic Android gamepads
+use Android's standard button positions over USB or Bluetooth. The configuration screen
+shows the corresponding physical button labels for Microsoft, Sony and Nintendo devices;
+other controllers keep the generic A/B/X/Y labels. Custom bindings remain saved per device.
+Both digital and analog triggers are accepted and merged, with no duplicate action.
+Right-stick Z/RZ and RX/RY layouts and device dead zones are handled; held actions are
+released when a controller disconnects or is reconfigured. Linux cannot open a second
+copy of the physical controller alongside the Android input bridge.
+
+Odin 2 Portal mappings are preserved. AYN Thor menu and in-game controls were validated in Daikatana.
+The other ports use the same Android controller normalization. Xbox, DualSense and Switch controllers still need physical testing.
