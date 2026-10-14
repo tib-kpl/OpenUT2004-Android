@@ -1,14 +1,14 @@
-# OpenUT2004-Android
+# UT2004-Android
 
 **Unofficial** Android launcher for **Unreal Tournament 2004** on ARM64 Android handhelds and
 phones, running the native Linux ARM64 engine of the community
 [OldUnreal UT2004 patch](https://github.com/OldUnreal/UT2004Patches).
 
 > [!IMPORTANT]
-> OpenUT2004 contains **no game files and no game engine**. On first launch it downloads the
+> Unreal Tournament 2004 contains **no game files and no game engine**. On first launch it downloads the
 > OldUnreal patch (engine) from its official GitHub releases. For the game data, you can
 > either point it to an existing installation (PC, DVD, GOG…), or let it download the game:
-> Epic Games allows Unreal Tournament 2004 to be distributed for free, and OpenUT2004 fetches
+> Epic Games allows Unreal Tournament 2004 to be distributed for free, and Unreal Tournament 2004 fetches
 > the DVD image from the same sources as OldUnreal's official installer (OldUnreal servers,
 > with the Internet Archive as fallback).
 
@@ -30,15 +30,15 @@ Tested on the **AYN Odin 2 Portal** (Snapdragon 8 Gen 2, Android 13).
 
 ## Installation
 
-1. Download `OpenUT2004-x.y.z.apk` from the [Releases](../../releases) page and install it.
-2. Start **OpenUT2004** and grant **all files access**.
+1. Download `UT2004-x.y.z.apk` from the [Releases](../../releases) page and install it.
+2. Start **Unreal Tournament 2004** and grant **all files access**.
 3. Either:
    - **Download the game (≈ 3 GB)**: pick a destination folder; an `UT2004` folder is
      created there. About 9 GB of free space are needed during installation (≈ 6 GB
      afterwards). The download continues with the screen off and resumes if interrupted;
    - or **I already have the game**: pick the folder of an existing UT2004 installation
      (the one containing `System`, `Maps`, `Textures`…).
-4. On first launch, OpenUT2004 installs its Linux runtime and downloads the OldUnreal patch.
+4. On first launch, Unreal Tournament 2004 installs its Linux runtime and downloads the OldUnreal patch.
    An Internet connection is required for that first launch only.
 
 To change the game folder later: **long-press the icon → "Changer le dossier du jeu"**.
@@ -150,7 +150,7 @@ cd android && ./gradlew assembleRelease
 - **Linux runtime**: [Debian](https://www.debian.org) 13 packages (glibc, Mesa, X.Org Xvfb,
   7-Zip, unshield…) and Mesa built from source, each under its own license.
 - License details and source code access: [THIRD_PARTY.md](THIRD_PARTY.md).
-- OpenUT2004's icon and artwork are original creations of this project.
+- Unreal Tournament 2004's icon and artwork are original creations of this project.
 
 ### Language, audio and restart
 

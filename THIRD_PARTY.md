@@ -1,6 +1,6 @@
 # Third-party software
 
-OpenUT2004 redistributes the following free software in binary form inside its APK. Their
+Unreal Tournament 2004 redistributes the following free software in binary form inside its APK. Their
 source code is available at the addresses below.
 
 ## proot
@@ -14,7 +14,7 @@ source code is available at the addresses below.
 ## Linux runtime (Debian 13 "trixie" arm64 packages)
 
 The bundled rootfs (`assets/runtime/rootfs.tgz`) contains files from unmodified Debian
-packages (glibc, Mesa, the X.Org Xvfb server, 7-Zip, unshield, dash…), OpenUT2004's own files
+packages (glibc, Mesa, the X.Org Xvfb server, 7-Zip, unshield, dash…), Unreal Tournament 2004's own files
 under `/opt/ut` and `/etc/asound.conf`, and the Mesa build described below under `/opt/turnip`.
 
 - Exact list of packages and versions: `packages.txt`, attached to every release and included

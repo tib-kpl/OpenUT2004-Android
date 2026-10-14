@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenUT2004"
+rootProject.name = "Unreal Tournament 2004"
 include(":app")

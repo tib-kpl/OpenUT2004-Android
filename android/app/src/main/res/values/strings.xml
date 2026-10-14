@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">OpenUT2004</string>
+    <string name="app_name">Unreal Tournament 2004</string>
     <string name="app_subtitle">Lanceur non officiel - moteur OldUnreal</string>
     <string name="shortcut_change_folder">Changer le dossier du jeu</string>
 
@@ -13,7 +13,7 @@
     <string name="btn_resolution_720">Résolution : 720p (fluide)</string>
     <string name="btn_resolution_1080">Résolution : 1080p (net)</string>
 
-    <string name="status_need_permission">OpenUT2004 a besoin de l\'accès aux fichiers pour lire (et installer) les données du jeu.</string>
+    <string name="status_need_permission">Unreal Tournament 2004 a besoin de l\'accès aux fichiers pour lire (et installer) les données du jeu.</string>
     <string name="status_no_game">Unreal Tournament 2004 n\'est pas encore installé.\n\nTéléchargez-le (diffusion gratuite autorisée par Epic Games, via OldUnreal) ou indiquez le dossier d\'une installation existante (PC, DVD, GOG…).</string>
     <string name="status_saved_missing">Le jeu n\'est plus présent dans :\n%1$s\n\nTéléchargez-le à nouveau ou choisissez son dossier.</string>
     <string name="status_pick_invalid">Ce dossier ne contient pas Unreal Tournament 2004 :\n%1$s\n\nÉléments manquants : %2$s</string>
@@ -22,7 +22,7 @@
     <string name="status_installed">Installation terminée :\n%1$s</string>
 
     <string name="download_confirm_title">Télécharger Unreal Tournament 2004</string>
-    <string name="download_confirm_text">Epic Games autorise la diffusion gratuite d\'Unreal Tournament 2004. OpenUT2004 télécharge l\'image du DVD depuis les serveurs d\'OldUnreal (ou Internet Archive), comme l\'installeur officiel d\'OldUnreal, puis l\'installe sur l\'appareil.\n\n• Téléchargement : environ 3 Go (Wi-Fi conseillé)\n• Espace nécessaire : 9 Go pendant l\'installation, environ 6 Go ensuite\n• Durée : de 20 minutes à 1 heure selon la connexion\n\nChoisissez ensuite le dossier où installer le jeu (mémoire interne ou carte SD). Un dossier « UT2004 » y sera créé.</string>
+    <string name="download_confirm_text">Epic Games autorise la diffusion gratuite d\'Unreal Tournament 2004. Ce lanceur télécharge l\'image du DVD depuis les serveurs d\'OldUnreal (ou Internet Archive), comme l\'installeur officiel d\'OldUnreal, puis l\'installe sur l\'appareil.\n\n• Téléchargement : environ 3 Go (Wi-Fi conseillé)\n• Espace nécessaire : 9 Go pendant l\'installation, environ 6 Go ensuite\n• Durée : de 20 minutes à 1 heure selon la connexion\n\nChoisissez ensuite le dossier où installer le jeu (mémoire interne ou carte SD). Un dossier « UT2004 » y sera créé.</string>
     <string name="download_confirm_ok">Choisir le dossier</string>
     <string name="download_no_space">Espace libre insuffisant : %1$d Go disponibles, %2$d Go nécessaires.</string>
     <string name="download_channel">Téléchargement du jeu</string>

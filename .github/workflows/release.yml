@@ -111,7 +111,7 @@ jobs:
           echo "OPENUT2004_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
           echo "OPENUT2004_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=v$NAME" >> "$GITHUB_ENV"
-          echo "APK_NAME=OpenUT2004-$NAME.apk" >> "$GITHUB_ENV"
+          echo "APK_NAME=UT2004-$NAME.apk" >> "$GITHUB_ENV"
 
       - name: Compilation
         env:
@@ -135,7 +135,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: OpenUT2004 ${{ env.OPENUT2004_VERSION_NAME }}
+          name: Unreal Tournament 2004 ${{ env.OPENUT2004_VERSION_NAME }}
           target_commitish: ${{ github.sha }}
           files: |
             android/${{ env.APK_NAME }}
