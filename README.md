@@ -173,3 +173,13 @@ copy of the physical controller alongside the Android input bridge.
 
 Odin 2 Portal mappings are preserved. AYN Thor menu and in-game controls were validated in Daikatana.
 The other ports use the same Android controller normalization. Xbox, DualSense and Switch controllers still need physical testing.
+
+### Audio output changes
+
+AudioTrack uses Android's selected media output (speakers, Bluetooth, wired or USB audio),
+without forcing a specific device or Bluetooth voice-call mode. Output route changes are
+logged for diagnostics. Unwritten PCM is retained after partial writes, and the output is
+recreated if Android returns `ERROR_DEAD_OBJECT`; the game engine keeps running.
+Pause/stop wake the audio worker and flush queued sound. Simulated partial-write,
+output-invalidation and pause/resume tests pass; physical headset transitions still need
+validation on the device.

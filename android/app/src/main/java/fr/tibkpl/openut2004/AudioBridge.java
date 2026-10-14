@@ -1,6 +1,10 @@
 package fr.tibkpl.openut2004;
 
 import android.media.AudioAttributes;
+import android.media.AudioDeviceInfo;
+import android.media.AudioRouting;
+import android.os.Handler;
+import android.os.Looper;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
 import android.system.ErrnoException;
@@ -14,8 +18,8 @@ import java.io.IOException;
 
 /**
  * Joue le son du moteur : OpenAL -> ALSA -> FIFO (PCM S16_LE stereo 48 kHz, voir
- * /etc/asound.conf du rootfs) -> AudioTrack. L'ecriture bloquante d'AudioTrack cadence
- * le mixage du jeu ; un petit tampon de FIFO limite la latence.
+ * /etc/asound.conf du rootfs) -> AudioTrack. Un petit tampon de FIFO et l'attente
+ * lorsque la sortie est pleine cadencent le mixage sans bloquer la pause ou l'arret.
  */
 final class AudioBridge {
 
@@ -29,6 +33,13 @@ final class AudioBridge {
     private boolean paused;
     private AudioTrack track;
     private Thread thread;
+    private final AudioRouting.OnRoutingChangedListener routeListener = router -> {
+        synchronized (AudioBridge.this) {
+            if (!running || router != track) return;
+            AudioDeviceInfo device = router.getRoutedDevice();
+            if (device != null) Log.i(TAG, "Route audio Android : type " + device.getType());
+        }
+    };
 
     AudioBridge(File fifo) {
         this.fifo = fifo;
@@ -52,9 +63,11 @@ final class AudioBridge {
      */
     synchronized void setPaused(boolean value) {
         paused = value;
-        if (track != null) {
-            if (value) track.pause();
-            else track.play();
+        if (track != null && running) {
+            if (value) {
+                track.pause();
+                track.flush();
+            } else track.play();
         }
         notifyAll();
     }
@@ -63,8 +76,13 @@ final class AudioBridge {
         while (paused && running) wait();
     }
 
-    void stop() {
+    synchronized void stop() {
         running = false;
+        notifyAll();
+        if (track != null) {
+            track.pause();
+            track.flush();
+        }
         if (thread != null) thread.interrupt();
         // Debloque une ouverture du FIFO en attente d'un ecrivain (non bloquant si aucun lecteur)
         try {
@@ -74,7 +92,7 @@ final class AudioBridge {
         }
     }
 
-    private void run() {
+    private synchronized void createTrack() {
         int minBuffer = AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_STEREO,
                 AudioFormat.ENCODING_PCM_16BIT);
         AudioTrack track = new AudioTrack.Builder()
@@ -91,12 +109,51 @@ final class AudioBridge {
                 .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build();
-        synchronized (this) {
-            this.track = track;
-            if (!paused) track.play();
+        this.track = track;
+        track.addOnRoutingChangedListener(routeListener, new Handler(Looper.getMainLooper()));
+        if (running && !paused) track.play();
+    }
+
+    private synchronized void releaseTrack() {
+        if (track != null) {
+            track.removeOnRoutingChangedListener(routeListener);
+            track.release();
+            track = null;
         }
+    }
+
+    /** Preserve unwritten PCM and rebuild the output if Android invalidates it on a route change. */
+    private void writeFrames(byte[] buffer, int bytes) throws IOException, InterruptedException {
+        int offset = 0;
+        boolean recovered = false;
+        while (offset < bytes && running) {
+            waitWhilePaused();
+            if (!running) return;
+            int written;
+            synchronized (this) {
+                if (paused) continue;
+                written = track.write(buffer, offset, bytes - offset, AudioTrack.WRITE_NON_BLOCKING);
+                if (written == AudioTrack.ERROR_DEAD_OBJECT && !recovered) {
+                    releaseTrack();
+                    createTrack();
+                    recovered = true;
+                    Log.i(TAG, "Sortie audio recreee apres invalidation Android");
+                    continue;
+                }
+            }
+            if (written < 0) throw new IOException("AudioTrack.write : " + written);
+            if (written == 0) {
+                synchronized (this) { if (running && !paused) wait(10); }
+            } else {
+                offset += written;
+            }
+        }
+    }
+
+    private void run() {
         byte[] buffer = new byte[3840]; // 20 ms
         try {
+            createTrack();
             while (running) {
                 // open() bloque jusqu'a ce que le moteur ouvre le FIFO en ecriture
                 try (FileInputStream in = new FileInputStream(fifo)) {
@@ -113,7 +170,7 @@ final class AudioBridge {
                         if ((n = in.read(buffer, filled, buffer.length - filled)) <= 0) break;
                         filled += n;
                         int frames = filled & ~3;
-                        track.write(buffer, 0, frames);
+                        writeFrames(buffer, frames);
                         System.arraycopy(buffer, frames, buffer, 0, filled - frames);
                         filled -= frames;
                     }
@@ -124,12 +181,10 @@ final class AudioBridge {
                     return;
                 }
             }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            Log.e(TAG, "Sortie audio indisponible", e);
         } finally {
-            synchronized (this) {
-                this.track = null;
-            }
-            track.stop();
-            track.release();
+            releaseTrack();
         }
     }
 }
